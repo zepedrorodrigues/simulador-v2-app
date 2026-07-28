@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Simulador de Crédito",
+    "slug": "simulador-v2-app",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "simulador",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": ["expo-router", "expo-status-bar"],
+    "ios": { "supportsTablet": true, "bundleIdentifier": "pt.simulador.app" },
+    "android": { "package": "pt.simulador.app", "edgeToEdgeEnabled": true },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    }
+  }
+}
