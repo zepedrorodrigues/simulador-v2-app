@@ -1,0 +1,60 @@
+# O portão da app.
+#
+# ⚠️ Invoca os scripts do `package.json`, não uma reimplementação deles. Se um
+# dia divergirem, o que mente é sempre o que passa — é a mesma regra do portão
+# do backend.
+#
+# O passo que importa é o `verificar-api`: ele regenera os tipos a partir da
+# CÓPIA commitada do esquema e reprova se o resultado diferir do que está no
+# repositório. ⚠️ Não vai à rede buscar o contrato ao backend, de propósito — um
+# CI que dependesse do outro repositório estar acessível fazia a app mudar de
+# comportamento sem ninguém lhe mexer (`APP.md` §2).
+name: portao
+
+on:
+  push:
+    branches: [development, main]
+  pull_request:
+    branches: [development, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      # ⚠️ Acções pinadas por SHA, não por tag: uma tag move-se, um SHA não.
+      - name: obter a árvore
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: instalar o Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci` instala exactamente o package-lock.json, sem o mexer.
+      - name: instalar as dependências
+        run: npm ci
+
+      - name: o contrato e os tipos em dia
+        run: npm run verificar-api
+
+      - name: tipos
+        run: npm run tipos
+
+      - name: testes
+        run: npm run teste
+
+      # ⚠️ O alvo web é o que se publica primeiro (APP.md §5), por isso o build
+      # dele entra no portão: um erro que só aparece no `export` é um erro que
+      # só se descobre no deploy.
+      - name: o alvo web compila
+        run: npm run exportar-web
