@@ -48,6 +48,10 @@ export default function Raiz() {
               outro. */}
           <Stack.Screen name="(pedido)" options={{ headerShown: false }} />
           <Stack.Screen name="ofertas/index" options={{ title: textos.ofertas.titulo }} />
+          {/* ⚠️ O título do detalhe é o nome do banco, e esse só se sabe depois
+              de a resposta chegar — por isso fica vazio aqui e o ecrã escreve-o
+              no corpo. Pôr «Detalhe» era um cabeçalho que não diz de quem. */}
+          <Stack.Screen name="ofertas/[banco]" options={{ title: "" }} />
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>

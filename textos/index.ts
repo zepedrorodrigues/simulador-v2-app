@@ -117,13 +117,54 @@ export const textos = {
       "O que escrever aqui não é guardado: fica no ecrã e desaparece quando sair.",
   },
 
-  // ⚠️ O ecrã das ofertas é da fase A5 e ainda não existe. O que está aqui é o
-  // suficiente para o passo 3 ter para onde levar a pessoa sem lhe mentir: diz
-  // que o pedido está montado e que a lista ainda não foi construída. Um ecrã
-  // que fingisse resultados era pior do que um que os não tem.
   ofertas: {
     titulo: "Ofertas",
-    porConstruir: "O pedido está completo. A lista de ofertas é a fase seguinte da app.",
+    aCalcular: "A calcular…",
+    semPedido: "Comece pelo princípio: o pedido ainda não está preenchido.",
+    irParaOPedido: "Preencher o pedido",
+    // ⚠️ Rótulos completos, e nunca só «3,61 %». A pergunta que a regra
+    // transversal do ECRAS.md faz — «3,61 % é TAEG ou TAN?» — responde-se aqui.
+    metricas: {
+      taeg: "TAEG",
+      prestacao_mensal: "Prestação",
+      tan: "TAN",
+      spread: "Spread",
+      mtic: "MTIC",
+    },
+    porMes: "/mês",
+    ordenarPor: "Ordenar por",
+    // ⚠️ A marca de derivada. O `~` no número não chega sozinho: alguém tem de
+    // dizer o que ele quer dizer, e diz-se uma vez no topo da lista.
+    taegEstimada: "A TAEG e o MTIC vêm com ~ porque são estimados a partir dos encargos medidos, não cotados pelo banco.",
+    semTaeg: "Sem TAEG",
+    semOferta: "Sem oferta",
+    // ⚠️ A estrela é uma afirmação, e esta linha diz o que ela afirma e o que
+    // não afirma. Ver a decisão em `dominio/ofertas.ts`.
+    estrelaExplicada:
+      "★ marca a melhor de cada métrica, e só entre ofertas simuladas exactamente como pediu.",
+    ajustada: "Simulada com alterações ao que pediu",
+    pressupostosEmFalta:
+      "Esta oferta traz números estimados sem declarar sob que hipóteses. É uma falha do nosso servidor, não do banco.",
+    verDetalhe: "Ver detalhe",
+    precosDe: "Preços de",
+    calculadoEm: "Comparação calculada",
+    semHora:
+      "Esta oferta veio sem a hora em que o preço foi medido, e por isso não se mostra como preço actual.",
+    nenhumaOferta: "Nenhum dos bancos escolhidos tem oferta para este pedido.",
+  },
+
+  detalhe: {
+    comoEvolui: "Como evolui",
+    composicao: "Composição",
+    produtosAplicados: "Bonificações aplicadas",
+    pressupostos: "Pressupostos da TAEG e do MTIC",
+    notas: "Notas",
+    // ⚠️ O rodapé do detalhe. Não é texto de enfeite: é a fronteira entre
+    // informação e proposta, e o `USO-RESPONSAVEL.md` põe-na onde é preciso.
+    proveniencia: "Valor indicativo, de simulador público. Não é uma proposta e não vincula o banco.",
+    semFases: "Este banco não devolveu o plano por fases.",
+    naoEncontrada: "Não há detalhe para mostrar: volte à lista e escolha uma oferta.",
+    voltar: "Voltar às ofertas",
   },
 
   // Os erros que a app tem de saber mostrar, um a um. ⚠️ A A6 do `APP.md` diz
@@ -196,6 +237,23 @@ export const frases = {
 
   /** ⚠️ A nota é a do banco, palavra por palavra: vem do contrato e não se reescreve. */
   notaDoBanco: (banco: string, nota: string) => `${banco}: ${nota}`,
+
+  /** «Preços de hoje às 05:00». ⚠️ O instante é o do preço MAIS ANTIGO da lista. */
+  precosDe: (quando: string) => `${textos.ofertas.precosDe} ${quando}`,
+
+  /** «Comparação calculada hoje às 09:12» — a hora da resposta, que não é a do preço. */
+  calculadoEm: (quando: string) => `${textos.ofertas.calculadoEm} ${quando}`,
+
+  /** «★ TAEG» — a métrica que aquele banco ganha. */
+  melhorEm: (metrica: string) => `★ ${metrica}`,
+
+  /** «TAN 3,250 · spread 0,900», já formatados pelo chamador. */
+  tanESpread: (tan: string, spread: string) =>
+    `${textos.ofertas.metricas.tan} ${tan} · ${textos.ofertas.metricas.spread.toLowerCase()} ${spread}`,
+
+  /** «Euribor 6M 2,351 + spread 0,900 = TAN 3,251», na composição do detalhe. */
+  composicaoDaTan: (indexante: string, valor: string, spread: string, tan: string) =>
+    `Euribor ${indexante.toUpperCase()} ${valor} + spread ${spread} = TAN ${tan}`,
 };
 
 /** «A, B e C» — com o «e» no sítio, que é onde a interpolação preguiçosa falha. */

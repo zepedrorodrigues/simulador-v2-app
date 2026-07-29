@@ -3,10 +3,15 @@
 App **Expo / React Native** do `simulador-v2` — comparação de crédito à
 habitação dos bancos portugueses. iOS, Android e web a partir do mesmo código.
 
-> **Estado: o pedido está de pé.** Expo SDK 57 + expo-router, tokens e os dois
-> temas, o contrato sincronizado do backend, e os **três passos do pedido** com o
-> formulário adaptado ao que `GET /api/v1/bancos` publica. O ecrã das ofertas é o
-> próximo — e diz que ainda não existe, em vez de fingir resultados.
+> **Estado: pede e mostra.** Expo SDK 57 + expo-router, tokens e os dois temas,
+> o contrato sincronizado do backend, os **três passos do pedido** com o
+> formulário adaptado ao que `GET /api/v1/bancos` publica, e a **lista de ofertas
+> e o detalhe** com a marca de derivada na TAEG, os pressupostos, as notas de
+> ajuste e a idade do preço.
+>
+> ⚠️ **Construída, não confirmada:** a forma da resposta está coberta contra os
+> tipos do contrato e nunca contra uma resposta real — a app ainda não falou com
+> o servidor a sério.
 
 O backend é [`zepedrorodrigues/simulador-v2`](https://github.com/zepedrorodrigues/simulador-v2),
 e é lá que vivem os documentos que os dois lados partilham:
