@@ -1,4 +1,10 @@
-import { eFalhaDaApi, pedir, traduzirEstatuto, type EspecieDeFalha } from "@/api/cliente";
+import {
+  eFalhaDaApi,
+  FalhaDaApi,
+  pedir,
+  traduzirEstatuto,
+  type EspecieDeFalha,
+} from "@/api/cliente";
 import { textos } from "@/textos";
 
 describe("a tradução dos estatutos", () => {
@@ -97,10 +103,7 @@ describe("o cliente", () => {
     await expect(pedir("/api/v1/bancos")).rejects.toMatchObject({ especie: "semRede" });
   });
 
-  // ⚠️ O `instanceof` sobre uma subclasse de `Error` devolve falso depois de
-  // transpilada, e o sítio onde isso se descobre seria um `catch` que deixa
-  // passar a falha em silêncio. É por isso que há uma marca.
-  it("reconhece-se sem instanceof", async () => {
+  it("reconhece a falha que ele próprio atirou", async () => {
     responderCom(503, { erro: { codigo: "serie_indisponivel", mensagem: "…" } });
 
     try {
@@ -110,5 +113,24 @@ describe("o cliente", () => {
       expect(eFalhaDaApi(erro)).toBe(true);
       expect(eFalhaDaApi(new Error("outra coisa"))).toBe(false);
     }
+  });
+
+  // ⚠️ **Este é o teste que justifica a marca, e o anterior não era.** Sob o
+  // Jest, `instanceof` sobre a subclasse de `Error` funciona — trocar a marca
+  // por `instanceof` não partia o teste de cima, e um teste que não distingue as
+  // duas implementações não prova nenhuma delas.
+  //
+  // O que distingue é isto: uma falha que não foi construída por ESTA cópia da
+  // classe. Acontece quando o módulo entra duas vezes no bundle, ou atravessa
+  // uma fronteira de contexto — e é aí que o `instanceof` diz «não é uma falha
+  // da API» sobre uma falha da API, e o `catch` a deixa passar em silêncio.
+  it("reconhece uma falha que não foi construída por esta cópia da classe", () => {
+    const deOutraCopia = Object.assign(new Error("semRede"), {
+      marca: "falha-da-api",
+      especie: "semRede",
+    });
+
+    expect(eFalhaDaApi(deOutraCopia)).toBe(true);
+    expect(deOutraCopia instanceof FalhaDaApi).toBe(false);
   });
 });
