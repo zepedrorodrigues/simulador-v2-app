@@ -1,0 +1,13 @@
+# Fins de linha LF em toda a árvore, incluindo em Windows.
+#
+# ⚠️ Sem isto, o portão desta app **não passa em Windows**, e passa no CI — que é
+# a pior combinação possível. O `contrato/openapi.yaml` é uma cópia byte a byte
+# do `api/openapi.yaml` do backend, que é LF por `.gitattributes` próprio; com
+# `core.autocrlf=true` o checkout de cá escrevia-o em CRLF, e o
+# `sincronizar-api --verificar` comparava os dois e dizia «o contrato do backend
+# mudou e a cópia deste repositório está velha» sobre ficheiros idênticos a menos
+# do fim de linha. O `api.d.ts` gerado tinha o mesmo problema pela mesma razão.
+#
+# É o mesmo travão que o backend tem, e pela mesma razão de fundo: um ficheiro
+# que é comparado com um gerado tem de ter fins de linha estáveis.
+* text=auto eol=lf

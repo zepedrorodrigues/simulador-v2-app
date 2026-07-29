@@ -43,6 +43,11 @@ export default function Raiz() {
           }}
         >
           <Stack.Screen name="index" options={{ title: textos.app.nome }} />
+          {/* ⚠️ O grupo `(pedido)` traz o seu próprio `Stack` — sem esconder o
+              cabeçalho daqui, os três passos apareciam com dois, um por cima do
+              outro. */}
+          <Stack.Screen name="(pedido)" options={{ headerShown: false }} />
+          <Stack.Screen name="ofertas/index" options={{ title: textos.ofertas.titulo }} />
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>

@@ -1,5 +1,7 @@
+import { router } from "expo-router";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { Botao } from "@/componentes/basicos";
 import { useTema } from "@/design/tema";
 import { espaco, raio, tipo } from "@/design/tokens";
 import { textos } from "@/textos";
@@ -7,10 +9,10 @@ import { textos } from "@/textos";
 /**
  * O ecrã de entrada.
  *
- * ⚠️ Por agora prova o que a fase A1 tem de provar: que os tokens e os dois
- * temas funcionam, e que nenhuma frase está escrita dentro do componente. Os
- * ecrãs a sério — o pedido em três passos, as ofertas, o detalhe — entram nas
- * fases seguintes, do `ECRAS.md`.
+ * ⚠️ **A postura aparece antes do formulário, e não depois.** É deliberado: o
+ * `USO-RESPONSAVEL.md` pede que a app diga o que é e o que não é onde é preciso,
+ * e o sítio onde é preciso é antes de a pessoa escrever o que quer que seja —
+ * não escondido nas definições nem em letra pequena por baixo dos resultados.
  */
 export default function Entrada() {
   const tema = useTema();
@@ -60,6 +62,8 @@ export default function Entrada() {
           {textos.postura.semDadosPessoais}
         </Text>
       </View>
+
+      <Botao titulo={textos.comum.comecar} aoTocar={() => router.push("/passo-1")} />
     </ScrollView>
   );
 }
