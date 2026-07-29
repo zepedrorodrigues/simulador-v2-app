@@ -97,9 +97,12 @@ describe("a estrela da melhor", () => {
   it("não a dá a uma oferta que o banco ajustou", () => {
     const ajustada = oferta({ banco_id: "montepio", taeg: 3.1, aplicado: { prazo_anos: 35 } });
     const limpa = oferta({ banco_id: "cgd", taeg: 3.74 });
+    // ⚠️ Duas limpas, senão a regra de baixo — «uma oferta sozinha não é a
+    // melhor de nada» — decidia este teste em vez da que ele quer exercer.
+    const outraLimpa = oferta({ banco_id: "bancoctt", taeg: 3.9 });
 
     expect(temAjuste(ajustada)).toBe(true);
-    expect(melhores([ajustada, limpa]).taeg).toBe("cgd");
+    expect(melhores([ajustada, limpa, outraLimpa]).taeg).toBe("cgd");
     // ⚠️ Mas continua na lista e continua ordenada — o que não leva é a marca.
     expect(ordenar([limpa, ajustada], "taeg").map((o) => o.banco_id)).toEqual([
       "montepio",
@@ -115,10 +118,25 @@ describe("a estrela da melhor", () => {
     expect(marcadas.taeg).toBeUndefined();
   });
 
+  // ⚠️ Encontrado a correr a app contra o servidor a sério (2026-07-29): com
+  // série de dois bancos e um deles sem o cenário pedido, a CGD ficava sozinha e
+  // apanhava as CINCO estrelas. Cada uma era verdadeira e o conjunto era falso —
+  // lia-se como recomendação forte onde não havia comparação nenhuma.
+  it("uma oferta sozinha não é a melhor de nada", () => {
+    const marcadas = melhores([
+      oferta({ banco_id: "cgd" }),
+      oferta({ banco_id: "novobanco", sucesso: false, taeg: undefined }),
+    ]);
+    expect(marcadas).toEqual({});
+  });
+
   it("não marca um banco que falhou", () => {
+    // ⚠️ A TAEG do que falhou é a mais baixa de propósito: se ele contasse,
+    // ganhava. Duas com sucesso para a regra da oferta sozinha não decidir isto.
     const marcadas = melhores([
       oferta({ banco_id: "bancoctt", sucesso: false, taeg: 0.1 }),
       oferta({ banco_id: "cgd", taeg: 3.74 }),
+      oferta({ banco_id: "novobanco", taeg: 3.9 }),
     ]);
     expect(marcadas.taeg).toBe("cgd");
   });

@@ -76,10 +76,20 @@ export function ordenar(ofertas: Oferta[], metrica: Metrica): Oferta[] {
  *
  * ⚠️ E um empate não dá estrela a ninguém: duas ofertas iguais na mesma métrica
  * não têm «a melhor», e marcar a primeira era deixar a ordem de chegada decidir.
+ *
+ * ⚠️ **Com uma só oferta elegível não há estrela nenhuma** — e isto aprendeu-se
+ * a correr a app contra o servidor a sério (2026-07-29). Com série de dois
+ * bancos e um deles sem o cenário pedido, a CGD ficava sozinha e o cartão dela
+ * apanhava as **cinco** estrelas: melhor TAEG, melhor prestação, melhor TAN,
+ * melhor spread, melhor MTIC. Cada uma era verdadeira e o conjunto era falso —
+ * lia-se como uma recomendação forte quando não havia comparação nenhuma. Uma
+ * estrela só diz alguma coisa contra outra oferta.
  */
 export function melhores(ofertas: Oferta[]): Partial<Record<Metrica, string>> {
   const elegiveis = ofertas.filter((oferta) => oferta.sucesso && !temAjuste(oferta));
   const marcadas: Partial<Record<Metrica, string>> = {};
+
+  if (elegiveis.length < 2) return marcadas;
 
   for (const metrica of metricas) {
     const comValor = elegiveis.filter((oferta) => valorDe(oferta, metrica) !== undefined);
