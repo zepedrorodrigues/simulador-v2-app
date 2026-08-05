@@ -143,6 +143,13 @@ export const textos = {
     estrelaExplicada:
       "★ marca a melhor de cada métrica, e só entre ofertas simuladas exactamente como pediu.",
     ajustada: "Simulada com alterações ao que pediu",
+    // ⚠️ É o cabeçalho, e não a explicação: a frase que diz o que aconteceu vem
+    // do servidor, em `notas`, e não se reescreve aqui. Dois sítios a explicar
+    // a mesma coisa divergem, e o que a app copiasse envelhecia sozinho.
+    //
+    // ⚠️ E não diz «preço errado». Uma sonda que discorda não prova que o preço
+    // mudou — prova que há razão para o confirmar.
+    emDuvida: "Preço por confirmar",
     pressupostosEmFalta:
       "Esta oferta traz números estimados sem declarar sob que hipóteses. É uma falha do nosso servidor, não do banco.",
     verDetalhe: "Ver detalhe",

@@ -7,7 +7,8 @@
 // 2. a nota do ajuste, sempre que `aplicado` não vem vazio;
 // 3. as bonificações aplicadas, senão um banco com descontos por omissão parece
 //    simplesmente mais barato;
-// 4. os bancos que falharam, com a razão em português.
+// 4. os bancos que falharam, com a razão em português;
+// 5. o aviso de um preço que a sonda contradisse (`fiabilidade: em_duvida`).
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -15,7 +16,7 @@ import type { Oferta } from "@/api/tipos";
 import { useTema } from "@/design/tema";
 import { espaco, raio, tipo } from "@/design/tokens";
 import { dinheiroAoCentimo, percentagem } from "@/dominio/formatar";
-import { pressupostosEmFalta, temAjuste, type Metrica } from "@/dominio/ofertas";
+import { avisosDoCartao, deveAvisar, pressupostosEmFalta, type Metrica } from "@/dominio/ofertas";
 import { frases, textos } from "@/textos";
 
 const t = textos.ofertas;
@@ -29,7 +30,11 @@ type Props = {
 
 export function CartaoDeOferta({ oferta, melhorEm, aoAbrir }: Props) {
   const tema = useTema();
-  const ajustada = temAjuste(oferta);
+  // ⚠️ Só o `em_duvida` se mostra. `confirmada` e `por_confirmar` mostram-se com
+  // SILÊNCIO — uma etiqueta de «confirmada» em toda a gente é ruído com aspecto
+  // de informação, e treina quem lê a saltar a única que importa (ECRAS.md §3).
+  const avisos = avisosDoCartao(oferta);
+  const { ajustada, emDuvida, notas } = avisos;
 
   if (!oferta.sucesso) {
     return <CartaoSemOferta oferta={oferta} />;
@@ -79,12 +84,23 @@ export function CartaoDeOferta({ oferta, melhorEm, aoAbrir }: Props) {
         </Text>
       )}
 
-      {/* ⚠️ A nota do ajuste vive no cartão e não numa gaveta. Números diferentes
-          dos pedidos sem o dizer, numa comparação de crédito, são enganadores. */}
-      {ajustada && (
+      {/* ⚠️ O aviso vive no cartão e não numa gaveta. Números diferentes dos
+          pedidos sem o dizer, numa comparação de crédito, são enganadores — e o
+          mesmo vale para um preço que uma verificação contradisse (ECRAS.md §3).
+
+          ⚠️ As `notas` mostram-se sempre que existem, e não só quando há ajuste.
+          Até aqui pendiam do `ajustada`, e uma nota sem ajuste — a do degrau de
+          LTV por resolver, por exemplo — não chegava ao cartão. O detalhe já a
+          mostrava, o cartão não, e é o cartão que quase toda a gente lê. */}
+      {deveAvisar(avisos) && (
         <View style={[estilos.aviso, { backgroundColor: tema.avisoFundo }]}>
-          <Text style={[estilos.textoDoAviso, { color: tema.aviso }]}>{t.ajustada}</Text>
-          {(oferta.notas ?? []).map((nota) => (
+          {ajustada && (
+            <Text style={[estilos.textoDoAviso, { color: tema.aviso }]}>{t.ajustada}</Text>
+          )}
+          {emDuvida && (
+            <Text style={[estilos.textoDoAviso, { color: tema.aviso }]}>{t.emDuvida}</Text>
+          )}
+          {notas.map((nota) => (
             <Text key={nota} style={[estilos.textoDoAviso, { color: tema.aviso }]}>
               {nota}
             </Text>

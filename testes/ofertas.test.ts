@@ -1,5 +1,8 @@
 import type { Oferta } from "@/api/tipos";
+import type { AvisosDoCartao } from "@/dominio/ofertas";
 import {
+  avisosDoCartao,
+  deveAvisar,
   idadeDosPrecos,
   melhores,
   ordenar,
@@ -183,3 +186,64 @@ describe("a idade dos preços", () => {
     expect(idadeDosPrecos([oferta({ banco_id: "cgd", capturado_em: undefined })])).toBeNull();
   });
 });
+
+describe("o que o cartão é obrigado a avisar", () => {
+  it("um preço que a sonda contradisse leva aviso", () => {
+    const avisos = avisosDoCartao(oferta({ banco_id: "cgd", fiabilidade: "em_duvida" }));
+
+    // ⚠️ A asserção diz o que o cartão FAZ, e não `true`. Uma falha que só diz
+    // «esperava true» manda quem lê procurar qual das regras é que caiu.
+    expect(oQueOCartaoMostra(avisos)).toEqual(["preço por confirmar"]);
+  });
+
+  // ⚠️ Os outros dois estados mostram-se com silêncio. Uma etiqueta de
+  // «confirmada» em toda a gente é ruído com aspecto de informação.
+  it.each(["confirmada", "por_confirmar", undefined] as const)(
+    "um banco %s não leva aviso nenhum",
+    (fiabilidade) => {
+      const avisos = avisosDoCartao(oferta({ banco_id: "cgd", fiabilidade }));
+
+      expect(oQueOCartaoMostra(avisos)).toEqual([]);
+    },
+  );
+
+  // ⚠️ Até 2026-08-05 as notas pendiam do ajuste no cartão, e uma nota sem
+  // ajuste não chegava lá. O detalhe mostrava-a; o cartão não.
+  it("uma nota sem ajuste nenhum chega ao cartão", () => {
+    const avisos = avisosDoCartao(
+      oferta({ banco_id: "cgd", notas: ["O degrau de LTV não foi resolvido."] }),
+    );
+
+    expect(oQueOCartaoMostra(avisos)).toEqual(["O degrau de LTV não foi resolvido."]);
+  });
+});
+
+// ⚠️ A dúvida NÃO tira a estrela, ao contrário do ajuste. A estrela diz «esta é a
+// melhor das que estão aqui», e uma reserva sobre a idade do preço não a torna
+// falsa — tirá-la escondia a comparação em vez de a qualificar (ECRAS.md §3).
+describe("a dúvida não tira a estrela", () => {
+  it("uma oferta em dúvida continua elegível para melhor", () => {
+    const lista = [
+      oferta({ banco_id: "cgd", taeg: 3.1, fiabilidade: "em_duvida" }),
+      oferta({ banco_id: "novobanco", taeg: 4.2, fiabilidade: "confirmada" }),
+    ];
+
+    expect(melhores(lista).taeg).toBe("cgd");
+  });
+});
+
+/**
+ * oQueOCartaoMostra reduz os avisos ao que a pessoa lê, por ordem.
+ *
+ * ⚠️ Existe para as falhas nomearem a regra que caiu. `expect(x).toBe(true)`
+ * diz «esperava true» e manda quem lê descobrir qual das cinco regras do cartão
+ * é que deixou de valer.
+ */
+function oQueOCartaoMostra(avisos: AvisosDoCartao): string[] {
+  if (!deveAvisar(avisos)) return [];
+  return [
+    ...(avisos.ajustada ? ["simulada com alterações"] : []),
+    ...(avisos.emDuvida ? ["preço por confirmar"] : []),
+    ...avisos.notas,
+  ];
+}
