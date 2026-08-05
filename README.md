@@ -9,9 +9,16 @@ habitação dos bancos portugueses. iOS, Android e web a partir do mesmo código
 > e o detalhe** com a marca de derivada na TAEG, os pressupostos, as notas de
 > ajuste e a idade do preço.
 >
-> ⚠️ **Construída, não confirmada:** a forma da resposta está coberta contra os
-> tipos do contrato e nunca contra uma resposta real — a app ainda não falou com
-> o servidor a sério.
+> ⚠️ **Confirmada uma vez, e a confirmação está velha.** A 2026-07-29 correu-se
+> o ciclo inteiro em local — Postgres em contentor, `migrar`, `varrer -bancos
+> cgd,novobanco` com 57 observações de 49 pontos reais, `servir`, e a app **web**
+> contra ele. Pagou-se: foi essa corrida que encontrou as cinco estrelas num
+> cartão sozinho ([#13](https://github.com/zepedrorodrigues/simulador-v2-app/pull/13)).
+>
+> ⚠️ **Falta refazê-la.** A `KAN-45` do backend entrou a 2026-08-01, **depois**
+> desta confirmação, e mudou quem aparece na lista: a resposta passou a trazer
+> uma oferta por banco **pedido** e não por banco medido. E confirmou-se só a
+> web — iOS e Android nunca falaram com o servidor.
 
 O backend é [`zepedrorodrigues/simulador-v2`](https://github.com/zepedrorodrigues/simulador-v2),
 e é lá que vivem os documentos que os dois lados partilham:
@@ -21,7 +28,11 @@ e é lá que vivem os documentos que os dois lados partilham:
 | [`docs/ECRAS.md`](https://github.com/zepedrorodrigues/simulador-v2/blob/development/docs/ECRAS.md) | os ecrãs, com as anotações de desenho |
 | [`docs/APP.md`](https://github.com/zepedrorodrigues/simulador-v2/blob/development/docs/APP.md) | a stack, a estrutura e as fases |
 | [`docs/API.md`](https://github.com/zepedrorodrigues/simulador-v2/blob/development/docs/API.md) | o contrato HTTP |
-| [`docs/USO-RESPONSAVEL.md`](https://github.com/zepedrorodrigues/simulador-v2/blob/development/docs/USO-RESPONSAVEL.md) | ⚠️ bloqueia a publicação nas lojas |
+
+⚠️ **A publicação nas lojas está bloqueada pela `KAN-24`**, que carrega as
+perguntas jurídicas por responder. Apontava-se aqui o `docs/USO-RESPONSAVEL.md`,
+que saiu do backend no `d155928` — recupera-se com
+`git show 35eb7a5:docs/USO-RESPONSAVEL.md`.
 
 ## Stack
 
