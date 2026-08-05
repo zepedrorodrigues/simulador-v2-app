@@ -143,3 +143,43 @@ export function idadeDosPrecos(ofertas: Oferta[]): string | null {
   if (instantes.length === 0) return null;
   return instantes.reduce((maisAntigo, actual) => (actual < maisAntigo ? actual : maisAntigo));
 }
+
+/**
+ * O que o cartão é obrigado a avisar sobre uma oferta.
+ *
+ * ⚠️ Vive aqui e não no componente para poder ser afirmado sem renderizar nada —
+ * é a mesma razão do `melhores` e do `pressupostosEmFalta`. Devolve decisões,
+ * não frases: as frases estão em `textos`, e as `notas` vêm do servidor palavra
+ * por palavra.
+ */
+export type AvisosDoCartao = {
+  ajustada: boolean;
+  emDuvida: boolean;
+  notas: string[];
+};
+
+/**
+ * avisosDoCartao reúne o que tem de aparecer no cartão desta oferta.
+ *
+ * ⚠️ **Só o `em_duvida` conta.** `confirmada` e `por_confirmar` — e a ausência do
+ * campo, que vale `por_confirmar` — mostram-se com silêncio. Uma etiqueta de
+ * «confirmada» em toda a gente é ruído com aspecto de informação, e treina quem
+ * lê a saltar a única que importa (`ECRAS.md` §3).
+ *
+ * ⚠️ E as `notas` entram sempre que existem, e não só quando há ajuste. Até
+ * 2026-08-05 pendiam do ajuste no cartão, e uma nota sem ajuste — a do degrau de
+ * LTV por resolver — não chegava lá. O detalhe mostrava-a; o cartão, que é o que
+ * quase toda a gente lê, não.
+ */
+export function avisosDoCartao(oferta: Oferta): AvisosDoCartao {
+  return {
+    ajustada: temAjuste(oferta),
+    emDuvida: oferta.fiabilidade === "em_duvida",
+    notas: oferta.notas ?? [],
+  };
+}
+
+/** deveAvisar diz se há alguma coisa para mostrar. */
+export function deveAvisar(a: AvisosDoCartao): boolean {
+  return a.ajustada || a.emDuvida || a.notas.length > 0;
+}
