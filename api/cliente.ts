@@ -6,9 +6,10 @@
 // estados que não são o caminho feliz» — ficava espalhada por toda a app em vez
 // de estar num sítio que se testa.
 //
-// ⚠️ O `/api/v1` **não leva chave**. A `X-API-Key` é do `/api/rate-catalog`, que
-// esta app não consome, e o `openapi.yaml` declara o `security` só lá. Uma chave
-// dentro de um bundle de browser é uma chave pública — está no `RESUME.md`.
+// ⚠️ O `/api/v1` **não leva chave**, e desde 2026-08-07 não há chave nenhuma a
+// levar: o `/api/rate-catalog` saiu do servidor e com ele o único
+// `securitySchemes` do contrato. O que protege esta API é o tecto por IP, e não
+// uma credencial — uma chave dentro de um bundle de browser é uma chave pública.
 
 import type { RespostaErro } from "./tipos";
 
@@ -34,7 +35,7 @@ export const baseDaApi = process.env.EXPO_PUBLIC_API_URL ?? "http://127.0.0.1:80
 export type EspecieDeFalha =
   | "semRede"
   | "servidorEmBaixo"
-  | "semSerie"
+  | "bancoOcupado"
   | "tectoExcedido"
   | "pedidoInvalido";
 
@@ -75,11 +76,24 @@ export function eFalhaDaApi(erro: unknown): erro is FalhaDaApi {
   return typeof erro === "object" && erro !== null && (erro as FalhaDaApi).marca === marcaDaFalha;
 }
 
-/** ⚠️ Um pedido que nunca responde é pior do que um que falha: o ecrã fica a
- * girar para sempre e a pessoa não tem o que fazer. Quinze segundos é folgado
- * para uma consulta e aritmética local, que é tudo o que uma comparação custa
- * desde a inversão da §1. */
-const limiteDeEspera = 15_000;
+/**
+ * Quanto se espera por uma resposta antes de desistir.
+ *
+ * ⚠️ Um pedido que nunca responde é pior do que um que falha: o ecrã fica a
+ * girar para sempre e a pessoa não tem o que fazer.
+ *
+ * ⚠️ **Tem de EXCEDER o prazo por banco do servidor, que são 15 s** — e eram 15 s
+ * aqui também. Os dois iguais é o pior valor possível: o cliente abortava no
+ * mesmo instante em que o servidor ia responder `200` com a oferta em falha e o
+ * banco nomeado, e a pessoa via um erro anónimo em vez de «o Banco Montepio não
+ * respondeu». Uma falha nomeada pelo servidor ganha sempre a uma anónima nossa,
+ * e para isso ele tem de chegar primeiro.
+ *
+ * ⚠️ O que fixa os 15 s do outro lado está medido: 8,4 s foi o pior caso
+ * observado (Montepio, 2026-08-06), e o prazo do servidor é ~1,8× isso. Estes
+ * 25 s dão-lhe 10 s de folga para responder depois de desistir do banco.
+ */
+const limiteDeEspera = 25_000;
 
 async function lerErro(resposta: Response): Promise<{ codigo?: string; campo?: string }> {
   try {
@@ -96,16 +110,25 @@ async function lerErro(resposta: Response): Promise<{ codigo?: string; campo?: s
 /**
  * traduzirEstatuto mapeia o estatuto HTTP para a espécie de falha.
  *
- * ⚠️ O 503 é o `SerieIndisponivel` do contrato e **não** «o servidor está em
- * baixo»: quer dizer que o varrimento ainda não correu para estes bancos, e
- * resolve-se correndo `simulador varrer`, não esperando. Empacotá-lo num «tente
- * mais tarde» genérico mandava a pessoa esperar por uma coisa que não vai
- * acontecer sozinha. É a distinção que o próprio `openapi.yaml` manda fazer.
+ * ⚠️ **O 503 é o `banco_ocupado` e NÃO «o servidor está em baixo»**, e o contrato
+ * diz por palavras para que serve a distinção: «para a app poder voltar a pedir
+ * este banco daqui a um instante em vez de o riscar da lista». O banco está bem;
+ * quem não tem lugar somos nós, e isto passa sozinho — daí o `Retry-After`. É a
+ * única falha que se repete (ver `pedirOferta`).
+ *
+ * ⚠️ Era o `SerieIndisponivel` («o varrimento ainda não correu para estes
+ * bancos») até 2026-08-07. Aquele resolvia-se correndo o varrimento e não
+ * esperando; este é o inverso. Empacotar os dois num «tente mais tarde» genérico
+ * mandava a pessoa esperar por uma coisa que não ia acontecer sozinha.
+ *
+ * ⚠️ **O 404 cai no `servidorEmBaixo`, de propósito.** Só se pede um banco cujo
+ * id veio do `GET /api/v1/bancos`; se o servidor não o conhece, o defeito é
+ * nosso e não um estado que valha a pena explicar a quem está do outro lado.
  */
 export function traduzirEstatuto(estatuto: number): EspecieDeFalha {
   if (estatuto === 400) return "pedidoInvalido";
   if (estatuto === 429) return "tectoExcedido";
-  if (estatuto === 503) return "semSerie";
+  if (estatuto === 503) return "bancoOcupado";
   return "servidorEmBaixo";
 }
 

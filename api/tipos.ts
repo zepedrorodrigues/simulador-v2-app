@@ -17,11 +17,10 @@ export type BancoInput = components["schemas"]["BancoInput"];
 export type Produto = components["schemas"]["Produto"];
 export type InputCanonico = components["schemas"]["InputCanonico"];
 
-export type ComparacaoPedido = components["schemas"]["ComparacaoPedido"];
+export type OfertaPedido = components["schemas"]["OfertaPedido"];
 export type Pedido = components["schemas"]["Pedido"];
 export type Titular = components["schemas"]["Titular"];
 
-export type Comparacao = components["schemas"]["Comparacao"];
 export type Oferta = components["schemas"]["Oferta"];
 export type Fase = components["schemas"]["Fase"];
 

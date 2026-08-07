@@ -13,13 +13,20 @@ import { textos } from "@/textos";
 const clienteDeConsultas = new QueryClient({
   defaultOptions: {
     queries: {
-      // ⚠️ Os preços mudam uma vez por varrimento (~4 por dia), não por
-      // segundo: cinco minutos de frescura é conservador e poupa pedidos.
+      // ⚠️ Cinco minutos, e o número deixou de ser arbitrário: é o
+      // `CACHE_VALIDADE` do servidor. Uma consulta que se dê por velha antes
+      // disso volta a pedir para receber o mesmo acerto de cache; depois disso,
+      // o servidor volta mesmo a perguntar ao banco.
       staleTime: 5 * 60 * 1000,
       // Duas tentativas e desiste. ⚠️ Insistir mais contra um servidor em baixo
       // é bater à porta de quem já disse que não está — e a app tem ecrã
       // desenhado para esse caso (`textos.erros`), que é melhor do que um
       // spinner eterno.
+      //
+      // ⚠️ **E NÃO se aplica ao caminho dos bancos**, que o sobrepõe (ver
+      // `api/ofertas.ts`): aqui uma tentativa custa uma consulta, ali custa 1 a
+      // 4 pedidos ao simulador público de um banco. Lá repete-se só o
+      // `banco_ocupado`, que é a única falha que passa sozinha.
       retry: 2,
     },
   },

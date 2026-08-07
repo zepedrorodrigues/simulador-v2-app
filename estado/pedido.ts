@@ -13,7 +13,14 @@
 
 import { create } from "zustand";
 
-import type { Banco, ComparacaoPedido, Finalidade, Indexante, TipoTaxa } from "@/api/tipos";
+import type {
+  Banco,
+  Finalidade,
+  Indexante,
+  OfertaPedido,
+  Pedido as PedidoDoContrato,
+  TipoTaxa,
+} from "@/api/tipos";
 import { camposUsados, dataParaIso } from "@/dominio/formulario";
 
 /** Um titular como está a ser escrito — a data ainda em «dd/mm/aaaa». */
@@ -218,16 +225,37 @@ export function idadeEmAnos(dataIso: string, hoje: Date): number {
 }
 
 /**
- * paraComparacaoPedido monta o corpo de `POST /api/v1/comparacoes`.
+ * O pedido montado: o que é comum a todos os bancos, e o que é de cada um.
+ *
+ * ⚠️ **Monta-se uma vez e reparte-se, em vez de se montar N vezes.** O `pedido`
+ * é literalmente o mesmo objecto em todos os bancos, e é o que torna a chave de
+ * cada consulta estável: montá-lo dentro do ciclo dava um objecto novo a cada
+ * render, e o TanStack Query via cinco chaves novas de cada vez.
+ */
+export type PedidoMontado = {
+  /** Os ids que a comparação leva, pela ordem da API. */
+  bancos: string[];
+  pedido: PedidoDoContrato;
+  /** Produtos escolhidos por banco. Um banco sem entrada não leva nenhum. */
+  produtos: Record<string, string[]>;
+};
+
+/**
+ * montarPedido reúne o que os três passos escreveram.
  *
  * Devolve `null` quando o formulário ainda não está de pé — o ecrã não chega a
  * chamar isto com o botão desactivado, e a garantia fica escrita à mesma.
+ *
+ * ⚠️ **Era o `paraComparacaoPedido`, e devolvia o corpo de uma rota que já não
+ * existe** (`POST /api/v1/comparacoes`, retirada a 2026-08-07). O que mudou é só
+ * a forma do que sai: as regras — que bancos, que produtos, quando é que se
+ * pergunta o rendimento — são as mesmas e não se tocaram.
  */
-export function paraComparacaoPedido(
+export function montarPedido(
   campos: CamposDoPedido,
   todosOsBancos: Banco[],
   hoje: Date,
-): ComparacaoPedido | null {
+): PedidoMontado | null {
   const ids = todosOsBancos.map((banco) => banco.id);
   const escolhidosIds = bancosEfectivos(campos.bancosEscolhidos, ids);
   if (escolhidosIds.length === 0) return null;
@@ -276,6 +304,27 @@ export function paraComparacaoPedido(
       garantia_publica: campos.garantiaPublica,
       ja_cliente: campos.jaCliente,
     },
-    ...(Object.keys(produtos).length > 0 ? { produtos } : {}),
+    produtos,
+  };
+}
+
+/**
+ * paraOfertaPedido corta do pedido montado o corpo de UM banco.
+ *
+ * ⚠️ **Só os produtos daquele banco viajam**, e não o mapa inteiro. O servidor
+ * agrupa-os pelo banco do caminho e verifica o prefixo de cada um; mandar-lhe os
+ * do Novo Banco no pedido à CGD era um `400` a nomear um produto que a pessoa
+ * escolheu para outro sítio.
+ *
+ * ⚠️ **E o campo desaparece quando está vazio**, em vez de ir `[]`. Uma lista
+ * vazia no contrato quer dizer «nenhum produto», e é o oposto do que se quer: um
+ * banco sem entrada leva os `por_omissao`, que é o que o simulador dele mostra a
+ * quem lá chega.
+ */
+export function paraOfertaPedido(montado: PedidoMontado, bancoId: string): OfertaPedido {
+  const dele = montado.produtos[bancoId];
+  return {
+    pedido: montado.pedido,
+    ...(dele !== undefined && dele.length > 0 ? { produtos: dele } : {}),
   };
 }

@@ -109,8 +109,13 @@ export const textos = {
   postura: {
     naoEProposta:
       "Valores indicativos, de simuladores públicos. Não são propostas, não vinculam o banco e não são aconselhamento financeiro.",
-    taegDerivada:
-      "A TAEG e o MTIC não vêm do banco: são calculados a partir dos encargos medidos.",
+    // ⚠️ Dizia «A TAEG e o MTIC não vêm do banco: são calculados a partir dos
+    // encargos medidos», e passou a ser falso a 2026-08-07: ao vivo é o
+    // simulador do banco que os devolve, para o pedido desta pessoa. O que fica
+    // é a distinção que continua verdadeira — simulação não é proposta —, e é a
+    // `taegOficial` abaixo que a diz.
+    taegDoSimulador:
+      "A TAEG e o MTIC são os que o simulador do banco devolveu para estes valores.",
     taegOficial:
       "A TAEG que vincula alguém vem na ficha de informação normalizada, depois de o banco avaliar quem pede.",
     semDadosPessoais:
@@ -133,28 +138,25 @@ export const textos = {
     },
     porMes: "/mês",
     ordenarPor: "Ordenar por",
-    // ⚠️ A marca de derivada. O `~` no número não chega sozinho: alguém tem de
-    // dizer o que ele quer dizer, e diz-se uma vez no topo da lista.
-    taegEstimada: "A TAEG e o MTIC vêm com ~ porque são estimados a partir dos encargos medidos, não cotados pelo banco.",
+    // ⚠️ **Havia aqui um `taegEstimada`** — «vêm com ~ porque são estimados a
+    // partir dos encargos medidos, não cotados pelo banco» — e o `~` que ela
+    // explicava. Saem com o modelo de encargos: os números são os do banco.
     semTaeg: "Sem TAEG",
     semOferta: "Sem oferta",
+    // ⚠️ Nomeia o banco. «A carregar…» numa lista de cinco linhas não diz por
+    // qual se está à espera, que é a única coisa que a pessoa quer saber.
+    aPerguntar: "A perguntar ao banco…",
+    naoChegou: "Não foi possível perguntar a este banco",
     // ⚠️ A estrela é uma afirmação, e esta linha diz o que ela afirma e o que
     // não afirma. Ver a decisão em `dominio/ofertas.ts`.
     estrelaExplicada:
       "★ marca a melhor de cada métrica, e só entre ofertas simuladas exactamente como pediu.",
-    ajustada: "Simulada com alterações ao que pediu",
     // ⚠️ É o cabeçalho, e não a explicação: a frase que diz o que aconteceu vem
     // do servidor, em `notas`, e não se reescreve aqui. Dois sítios a explicar
     // a mesma coisa divergem, e o que a app copiasse envelhecia sozinho.
-    //
-    // ⚠️ E não diz «preço errado». Uma sonda que discorda não prova que o preço
-    // mudou — prova que há razão para o confirmar.
-    emDuvida: "Preço por confirmar",
-    pressupostosEmFalta:
-      "Esta oferta traz números estimados sem declarar sob que hipóteses. É uma falha do nosso servidor, não do banco.",
+    ajustada: "Simulada com alterações ao que pediu",
     verDetalhe: "Ver detalhe",
     precosDe: "Preços de",
-    calculadoEm: "Comparação calculada",
     semHora:
       "Esta oferta veio sem a hora em que o preço foi medido, e por isso não se mostra como preço actual.",
     nenhumaOferta: "Nenhum dos bancos escolhidos tem oferta para este pedido.",
@@ -164,7 +166,9 @@ export const textos = {
     comoEvolui: "Como evolui",
     composicao: "Composição",
     produtosAplicados: "Bonificações aplicadas",
-    pressupostos: "Pressupostos da TAEG e do MTIC",
+    // ⚠️ **Havia aqui uma secção «Pressupostos da TAEG e do MTIC»**, e sai com o
+    // campo do contrato. As hipóteses que o BANCO declara continuam a aparecer,
+    // e aparecem onde sempre estiveram: nas `notas`, palavra por palavra.
     notas: "Notas",
     // ⚠️ O rodapé do detalhe. Não é texto de enfeite: é a fronteira entre
     // informação e proposta, e o `USO-RESPONSAVEL.md` põe-na onde é preciso.
@@ -186,10 +190,13 @@ export const textos = {
       titulo: "O serviço não está a responder",
       corpo: "Isto é do nosso lado. Tente daqui a pouco.",
     },
-    semSerie: {
-      titulo: "Ainda não há preços para comparar",
-      corpo:
-        "Os preços vêm de um varrimento aos simuladores dos bancos, e ainda não correu nenhum. Tente mais tarde.",
+    // ⚠️ Diz que o banco está bem, e é a informação que importa: quem não tinha
+    // lugar éramos nós. Substitui um `semSerie` («os preços vêm de um varrimento
+    // e ainda não correu nenhum»), que morreu com o varrimento — e que dizia o
+    // oposto disto, porque aquele não passava por se esperar.
+    bancoOcupado: {
+      titulo: "Este banco está a ser consultado",
+      corpo: "Já vão pedidos nossos a mais para este banco. Volte a tentar daqui a pouco.",
     },
     tectoExcedido: {
       titulo: "Demasiadas comparações",
@@ -248,8 +255,16 @@ export const frases = {
   /** «Preços de hoje às 05:00». ⚠️ O instante é o do preço MAIS ANTIGO da lista. */
   precosDe: (quando: string) => `${textos.ofertas.precosDe} ${quando}`,
 
-  /** «Comparação calculada hoje às 09:12» — a hora da resposta, que não é a do preço. */
-  calculadoEm: (quando: string) => `${textos.ofertas.calculadoEm} ${quando}`,
+  /**
+   * «A perguntar ao Banco Montepio…» — a linha de um banco que ainda não respondeu.
+   *
+   * ⚠️ Nomeia o banco porque a lista tem cinco linhas e a pessoa quer saber por
+   * qual está à espera. ⚠️ E **havia aqui um `calculadoEm`** — «Comparação
+   * calculada hoje às 09:12» —, que saiu com o `calculado_em` da `Comparacao`:
+   * cada oferta vem do banco no momento, e o `capturado_em` dela já é a idade do
+   * preço.
+   */
+  aPerguntarAo: (banco: string) => `A perguntar ao ${banco}…`,
 
   /** «★ TAEG» — a métrica que aquele banco ganha. */
   melhorEm: (metrica: string) => `★ ${metrica}`,

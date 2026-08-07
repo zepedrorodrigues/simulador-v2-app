@@ -14,7 +14,7 @@ import {
   leituraDoIndexante,
   periodosFixosOferecidos,
 } from "@/dominio/formulario";
-import { paraComparacaoPedido, produtosDoBanco, usarPedido } from "@/estado/pedido";
+import { montarPedido, produtosDoBanco, usarPedido } from "@/estado/pedido";
 import { frases, textos } from "@/textos";
 
 const t = textos.pedido.passo3;
@@ -22,11 +22,13 @@ const t = textos.pedido.passo3;
 /**
  * Passo 3 — a taxa e os bancos.
  *
- * ⚠️ **Não há aqui tempo por banco, e o campo que o alimentava saiu do
- * contrato.** Estava desenhado «☑ CGD ~2 s / ☐ Banco BPI ~50 s», e deixou de ser
- * verdade: desde a inversão da §1 nenhum banco é interrogado no caminho do
- * cliente, e a resposta custa o mesmo com um banco ou com dez. Anunciar «~2 s»
- * era avisar de uma espera que não existe.
+ * ⚠️ **Não há aqui tempo por banco, e a razão mudou.** Estava desenhado «☑ CGD
+ * ~2 s / ☐ Banco BPI ~50 s», e o campo que o alimentava saiu do contrato quando
+ * deixou de haver espera nenhuma. **Volta a haver** (2026-08-06): cada banco
+ * escolhido é um pedido, e o Montepio chegou a passar dos 10 s. O número
+ * continua a não se anunciar, agora por outro motivo — com um pedido por banco,
+ * a lista **enche-se à medida que chegam**, e um tempo total é o do banco mais
+ * lento anunciado a quem já está a ver quatro preços.
  *
  * ⚠️ **As bonificações estão aqui, e por omissão vão as do banco.** É a decisão
  * do domínio — «quem escolhe é a pessoa: o `por_omissao` diz à app o que
@@ -177,14 +179,14 @@ export default function Passo3() {
                 variante="secundario"
                 aoTocar={() => router.back()}
               />
-              {/* ⚠️ A guarda é o `paraComparacaoPedido` inteiro e não «há bancos
+              {/* ⚠️ A guarda é o `montarPedido` inteiro e não «há bancos
                   marcados»: quem chegue a este ecrã por URL — e no alvo web
                   chega, porque as rotas são reais — salta os dois primeiros
                   passos, e sem isto submetia um pedido sem valor de imóvel para
                   receber um 400 do outro lado. */}
               <Botao
                 titulo={frases.compararComContagem(escolhidos.length)}
-                desactivado={paraComparacaoPedido(campos, selecao.todos, new Date()) === null}
+                desactivado={montarPedido(campos, selecao.todos, new Date()) === null}
                 descricao={escolhidos.length === 0 ? t.nenhumBanco : undefined}
                 aoTocar={() => router.push("/ofertas")}
               />
