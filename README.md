@@ -3,22 +3,26 @@
 App **Expo / React Native** do `simulador-v2` — comparação de crédito à
 habitação dos bancos portugueses. iOS, Android e web a partir do mesmo código.
 
-> **Estado: pede e mostra.** Expo SDK 57 + expo-router, tokens e os dois temas,
-> o contrato sincronizado do backend, os **três passos do pedido** com o
-> formulário adaptado ao que `GET /api/v1/bancos` publica, e a **lista de ofertas
-> e o detalhe** com a marca de derivada na TAEG, os pressupostos, as notas de
-> ajuste e a idade do preço.
+> **Estado: pergunta aos bancos, e a lista enche-se.** Expo SDK 57 +
+> expo-router, tokens e os dois temas, o contrato sincronizado do backend, os
+> **três passos do pedido** com o formulário adaptado ao que `GET /api/v1/bancos`
+> publica, e a **lista de ofertas e o detalhe** com as notas de ajuste e a idade
+> do preço.
 >
-> ⚠️ **Confirmada uma vez, e a confirmação está velha.** A 2026-07-29 correu-se
-> o ciclo inteiro em local — Postgres em contentor, `migrar`, `varrer -bancos
-> cgd,novobanco` com 57 observações de 49 pontos reais, `servir`, e a app **web**
-> contra ele. Pagou-se: foi essa corrida que encontrou as cinco estrelas num
-> cartão sozinho ([#13](https://github.com/zepedrorodrigues/simulador-v2-app/pull/13)).
+> ⚠️ **O fan-out vive aqui** (2026-08-07). Cada banco escolhido é um
+> `POST /api/v1/ofertas/{banco}`, **três em voo** de cada vez, e a lista aparece
+> logo com todos e preenche-se à medida que respondem. Uma linha tem três
+> estados: à espera, servida, ou **não chegou** — e este último não se disfarça
+> de oferta em falha, porque essa traz a razão *do banco*.
 >
-> ⚠️ **Falta refazê-la.** A `KAN-45` do backend entrou a 2026-08-01, **depois**
-> desta confirmação, e mudou quem aparece na lista: a resposta passou a trazer
-> uma oferta por banco **pedido** e não por banco medido. E confirmou-se só a
-> web — iOS e Android nunca falaram com o servidor.
+> ⚠️ **Esteve partida entre 2026-08-06 e 2026-08-07, com a suite verde.** Chamava
+> o `POST /api/v1/comparacoes`, retirado do backend, e nenhum teste desta app
+> fala com o servidor. O que o denunciou foi ler o código — é a razão de a
+> confirmação de ponta a ponta abaixo não ser opcional.
+>
+> ⚠️ **A TAEG e o MTIC deixaram de vir com `~`.** Eram derivados de um modelo de
+> encargos do servidor; ao vivo são os que o simulador do banco cotou. O que a
+> app continua obrigada a dizer é que uma simulação não é uma proposta.
 
 O backend é [`zepedrorodrigues/simulador-v2`](https://github.com/zepedrorodrigues/simulador-v2),
 e é lá que vivem os documentos que os dois lados partilham:

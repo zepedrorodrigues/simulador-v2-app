@@ -1,7 +1,8 @@
 import type { CamposDoPedido } from "@/estado/pedido";
 import {
   bancosEfectivos,
-  paraComparacaoPedido,
+  montarPedido,
+  paraOfertaPedido,
   passo1Pronto,
   passo2Pronto,
   pedeRendimento,
@@ -112,11 +113,11 @@ describe("o passo 2", () => {
   });
 });
 
-describe("o corpo de POST /api/v1/comparacoes", () => {
+describe("o pedido montado", () => {
   const todos = [cgd, novobanco, montepio];
 
   it("leva os bancos, o pedido e as bonificações por omissão", () => {
-    const corpo = paraComparacaoPedido(camposDeTeste(), todos, hoje);
+    const corpo = montarPedido(camposDeTeste(), todos, hoje);
 
     expect(corpo).not.toBeNull();
     expect(corpo?.bancos).toEqual(["cgd", "novobanco", "montepio"]);
@@ -130,7 +131,7 @@ describe("o corpo de POST /api/v1/comparacoes", () => {
   // taxa variável não tem período fixo». O campo fica no estado quando a pessoa
   // recua e muda de taxa, e é aqui que se decide que ele não viaja.
   it("não leva período fixo numa taxa variável", () => {
-    const corpo = paraComparacaoPedido(
+    const corpo = montarPedido(
       camposDeTeste({ tipoTaxa: "variavel", periodoFixoAnos: 5 }),
       todos,
       hoje,
@@ -141,7 +142,7 @@ describe("o corpo de POST /api/v1/comparacoes", () => {
 
   // ⚠️ E numa fixa não há Euribor nenhuma a que indexar.
   it("não leva indexante numa taxa fixa", () => {
-    const corpo = paraComparacaoPedido(camposDeTeste({ tipoTaxa: "fixa" }), todos, hoje);
+    const corpo = montarPedido(camposDeTeste({ tipoTaxa: "fixa" }), todos, hoje);
     expect(corpo?.pedido.euribor_indexante).toBeUndefined();
     expect(corpo?.pedido.fixed_period_years).toBe(5);
   });
@@ -149,7 +150,7 @@ describe("o corpo de POST /api/v1/comparacoes", () => {
   // ⚠️ Zero e não um ordenado inventado: o campo é obrigatório no contrato e
   // inerte em todos os bancos que esta comparação leva.
   it("manda zero de rendimento quando não o perguntou", () => {
-    const corpo = paraComparacaoPedido(
+    const corpo = montarPedido(
       camposDeTeste({
         bancosEscolhidos: ["cgd", "montepio"],
         titulares: [{ dataNascimento: "12/04/1990", rendimentoMensal: null }],
@@ -162,10 +163,44 @@ describe("o corpo de POST /api/v1/comparacoes", () => {
   });
 
   it("não monta pedido nenhum sem bancos", () => {
-    expect(paraComparacaoPedido(camposDeTeste({ bancosEscolhidos: [] }), todos, hoje)).toBeNull();
+    expect(montarPedido(camposDeTeste({ bancosEscolhidos: [] }), todos, hoje)).toBeNull();
   });
 
   it("não monta pedido nenhum com o passo 1 por acabar", () => {
-    expect(paraComparacaoPedido(camposDeTeste({ montante: null }), todos, hoje)).toBeNull();
+    expect(montarPedido(camposDeTeste({ montante: null }), todos, hoje)).toBeNull();
+  });
+});
+
+describe("o corpo de POST /api/v1/ofertas/{banco}", () => {
+  const todos = [cgd, novobanco, montepio];
+  const montado = montarPedido(camposDeTeste(), todos, hoje);
+
+  // ⚠️ **Cada banco leva SÓ os produtos dele.** O servidor agrupa-os pelo banco
+  // do caminho e verifica o prefixo de cada um: mandar-lhe os do Novo Banco no
+  // pedido à CGD é um 400 a nomear um produto que a pessoa escolheu para outro
+  // sítio. Era um risco que não existia no `/comparacoes`, onde o mapa inteiro
+  // viajava de uma vez e o servidor o repartia.
+  it("leva só os produtos do banco a que se está a perguntar", () => {
+    expect(paraOfertaPedido(montado!, "novobanco").produtos).toEqual([
+      "novobanco:primeiro_banco",
+    ]);
+    expect(paraOfertaPedido(montado!, "cgd").produtos).toBeUndefined();
+  });
+
+  // ⚠️ O campo desaparece em vez de ir `[]`. Uma lista vazia no contrato quer
+  // dizer «nenhum produto», que é o oposto do que se quer: um banco sem entrada
+  // leva os `por_omissao`, que é o que o simulador dele mostra a quem lá chega.
+  it("omite o campo em vez de mandar lista vazia", () => {
+    expect("produtos" in paraOfertaPedido(montado!, "cgd")).toBe(false);
+  });
+
+  // ⚠️ **É o MESMO objecto em todos os bancos, e não uma cópia.** É o que torna a
+  // chave de cada consulta estável entre renders: montá-lo dentro do ciclo dava
+  // um objecto novo de cada vez, e o TanStack Query via cinco chaves novas — o
+  // que, no caminho ao vivo, é cinco pedidos a cinco bancos por render.
+  it("partilha o mesmo pedido entre bancos", () => {
+    expect(paraOfertaPedido(montado!, "cgd").pedido).toBe(
+      paraOfertaPedido(montado!, "novobanco").pedido,
+    );
   });
 });

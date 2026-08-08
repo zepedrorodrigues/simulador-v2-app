@@ -24,7 +24,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/comparacoes": {
+    "/api/v1/ofertas/{banco}": {
         parameters: {
             query?: never;
             header?: never;
@@ -34,49 +34,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Compara as ofertas dos bancos escolhidos. Síncrono.
-         * @description ⚠️ Responde de uma vez, com estatuto 200. Não há trabalho em segundo plano, identificador para sondar, nem estado `em_curso` — e a diferença não é de estilo. Desde a inversão da §1 do ARQUITETURA.md (2026-07-25) uma comparação NÃO fala com banco nenhum: lê a série varrida em hora morta e calcula localmente. Custa uma consulta e aritmética, e não as dezenas de segundos de scraping que justificavam o 202 e a sondagem.
-         *     ⚠️ Nada do pedido é persistido (§7.5, e a postura pública do README): não há recurso a que voltar, e é por isso que não existe `GET /api/v1/comparacoes/{id}`. Poder sondar uma resposta obrigaria a guardar o pedido que a gerou — que é precisamente o dado pessoal que este serviço se recusa a ter. A ausência da rota é a decisão, não uma lacuna.
-         *     ⚠️ A `taeg` e o `mtic` de cada oferta são DERIVADOS, não medidos, e cada oferta declara em `pressupostos` sobre que hipóteses. Ver o schema da Oferta.
+         * Pergunta a UM banco o preço do crédito descrito. Ao vivo.
+         * @description Vai ao simulador público do banco com os valores que a pessoa introduziu e devolve o que ele respondeu. Demora o que o banco demorar, com um prazo nosso por cima.
+         *
+         *     ⚠️ É POST e não GET porque o pedido leva data de nascimento e rendimento: num GET isso viajava na query string, e ficava no histórico do browser, nos logs de qualquer proxy pelo caminho e no Referer.
+         *
+         *     ⚠️ Um banco que não responde a tempo NÃO é um erro deste pedido: a resposta é 200 com a oferta em falha e o código `banco_indisponivel`. Quem falhou foi o banco, e a app põe uma linha com ele nomeado em vez de um ecrã de erro.
          */
-        post: operations["compararOfertas"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rate-catalog": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * ⚠️ CONGELADA — a série de mercado, compatível ao byte com o v1.
-         * @description Consumida em produção pelo viabilidade-imobiliaria (src/viabilidade/taxas.py). Nomes em inglês e snake_case, ao contrário do resto do repositório. Três armadilhas de compatibilidade, todas cobertas pelo teste de contrato contra uma amostra real do v1: (1) números, não strings — a serialização de decimais em Go põe aspas por omissão, e aqui a saída é `number`; (2) `captured_at` sem fuso — o v1 serializava instantes ingénuos (`2026-07-22T05:00:11`, sem Z); este endpoint replica o formato antigo, por isso é `string` e não `date-time`; (3) `products` é sempre lista, nunca null. Sem `X-API-Key` configurada o endpoint fica aberto — comportamento de desenvolvimento, com aviso alto no arranque.
-         */
-        get: operations["obterRateCatalog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rate-catalog/snapshots": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** ⚠️ CONGELADA — os varrimentos disponíveis, com contagem de linhas. */
-        get: operations["listarSnapshots"];
-        put?: never;
-        post?: never;
+        post: operations["ofertaDeUmBanco"];
         delete?: never;
         options?: never;
         head?: never;
@@ -156,21 +121,11 @@ export interface components {
             /** @example dinheiro */
             tipo: string;
         };
-        ComparacaoPedido: {
-            /**
-             * @example [
-             *       "cgd",
-             *       "novobanco",
-             *       "montepio",
-             *       "bancoctt"
-             *     ]
-             */
-            bancos: string[];
+        /** @description O pedido para UM banco. Não leva lista de bancos: o banco vem no caminho, e os produtos são só os desse banco. */
+        OfertaPedido: {
             pedido: components["schemas"]["Pedido"];
-            /** @description Produtos escolhidos por banco. Chave = id do banco. */
-            produtos?: {
-                [key: string]: string[];
-            };
+            /** @description Ids dos produtos escolhidos deste banco. */
+            produtos?: string[];
         };
         Pedido: {
             /** Format: double */
@@ -201,20 +156,6 @@ export interface components {
             /** Format: double */
             rendimento_mensal: number;
         };
-        /**
-         * @description O resultado completo, de uma vez.
-         *     ⚠️ Não tem `id`, `estado` nem `progresso`, e nenhum dos três falta por esquecimento — a resposta É o cálculo inteiro, e não o primeiro estado de um trabalho que continua. Estavam aqui um `SimulacaoCriada` (`{id, estado, bancos, duracao_estimada_s}`) e um `Simulacao` com `estado: em_curso | terminado` e `progresso: {prontos, total}`: existiam para a app desenhar uma barra enquanto se falava com os bancos. Já não se fala com os bancos no caminho do cliente, e uma barra de progresso sobre uma consulta a Postgres seria teatro.
-         *     ⚠️ Também não tem `pedido_efectivo`. Aquele campo trazia `{montante, valor_imovel, quantizado}` porque a cache quantizava o montante para partilhar entradas entre pedidos parecidos, e a app tinha de mostrar o valor efectivamente simulado em vez do pedido. Sem cache não há quantização: o cálculo usa o montante que foi pedido, ao cêntimo. O que um banco ajusta (prazo, período fixo, indexante) continua a viajar em `Oferta.aplicado`, com a nota obrigatória agarrada — por banco, que é onde o ajuste acontece, e não num campo global que fingia valer para todos.
-         */
-        Comparacao: {
-            /**
-             * Format: date-time
-             * @description Quando ESTA resposta foi calculada.
-             *     ⚠️ Não é o `capturado_em` de cada oferta, que é quando o preço foi medido no banco. Os dois são diferentes por construção, e é precisamente essa diferença que diz à pessoa a idade do preço que está a ver — por isso viajam os dois, e por isso nenhum deles é opcional numa oferta com sucesso.
-             */
-            calculado_em: string;
-            ofertas: components["schemas"]["Oferta"][];
-        };
         /** @description ⚠️ Quando `aplicado` não está vazio, os números não correspondem ao pedido — a app é obrigada a mostrar a nota junto do valor. `erro` só aparece quando `sucesso` é falso. */
         Oferta: {
             banco_id: string;
@@ -222,37 +163,31 @@ export interface components {
             sucesso: boolean;
             /**
              * Format: double
-             * @description Spread do degrau de LTV que contém o rácio pedido, mais a Euribor do tenor aplicável — ambos medidos. Na fixa e na mista, a taxa da fase fixa é a observação do período que o banco pratica.
+             * @description A TAN que o banco devolveu para este pedido.
              */
             tan?: number;
             /**
              * Format: double
-             * @description ⚠️ Do INTERVALO de LTV medido que contém o rácio pedido, e não de uma banda assumida. Num degrau que não se conseguiu resolver é o lado mais CARO do intervalo (Directiva 2014/17/UE, Anexo I, Parte II, alínea (d)), e `notas` traz a frase que nomeia os dois lados.
+             * @description O spread que o banco aplicou a este pedido. ⚠️ Não é uma banda assumida nem um intervalo por resolver: é o número que ele devolveu, para o rácio de financiamento que esta pessoa pediu.
              */
             spread?: number;
             /**
              * Format: double
-             * @description Amortização francesa sobre a `tan` e o montante pedido. É aritmética exacta, não medição — e é por isso que responde ao montante desta pessoa, e não ao do cenário de referência.
+             * @description A prestação mensal que o banco devolveu para este pedido.
              */
             prestacao_mensal?: number;
             /**
              * Format: double
-             * @description ⚠️ DERIVADA, não medida. Ver `pressupostos`, que é obrigatório sempre que este campo vem preenchido.
-             *     A TAEG depende dos encargos (comissões, imposto, seguros) e o seguro de vida depende de quem pede — e a série de mercado é varrida com um titular NEUTRO e fictício, sobre um cenário de referência fixo (§4). Não existe, portanto, TAEG medida para esta pessoa. O que se faz é atribuir a encargos a diferença entre a TAEG e a TAN observadas no ponto de referência, e reamortizar sobre os fluxos deste pedido.
-             *     ⚠️ A repartição desses encargos entre comissões, imposto e seguro NÃO está medida: é inferida. Quem lê este número tem de o tratar como indicativo, e a app é obrigada a mostrar `pressupostos` junto dele — é o que o Anexo I e o Anexo II da MCD mandam fazer a um valor que depende de hipóteses declaradas.
+             * @description A TAEG que o simulador do banco devolveu.
+             *     ⚠️ **Cotada por ele, e não derivada por nós.** Dizia aqui «DERIVADA, não medida», e era verdade enquanto os preços vinham da série varrida. Deixou de ser a 2026-08-06.
+             *     ⚠️ Continua a NÃO ser a TAEG que vincula alguém: essa vem na ficha de informação normalizada, depois de o banco avaliar quem pede. É a distinção que a app é obrigada a mostrar — mas é uma distinção entre simulação e proposta, não entre medido e estimado.
              */
             taeg?: number;
             /**
              * Format: double
-             * @description ⚠️ DERIVADO, pela mesma razão e sobre o mesmo modelo de encargos que a `taeg`. Ver `pressupostos`.
+             * @description O MTIC que o simulador do banco devolveu, pela mesma razão que a `taeg`.
              */
             mtic?: number;
-            /**
-             * @description As hipóteses sob as quais a `taeg` e o `mtic` desta oferta foram derivados, em português e legíveis por uma pessoa.
-             *     ⚠️ Lista à parte de `notas`, e não misturada nela, de propósito: as duas têm estatutos diferentes. Uma `nota` é um aviso sobre o que aconteceu a ESTE pedido — o banco encurtou o prazo, o degrau de LTV não estava resolvido. Um pressuposto é uma hipótese de cálculo que a MCD obriga a declarar junto do número que dela depende (Anexo I, Parte II; Anexo II). Empacotadas na mesma lista, a app ficava sem forma de as apresentar como o que são.
-             *     ⚠️ Não vazia sempre que `taeg` ou `mtic` vêm preenchidos. Vazia com um deles preenchido é defeito nosso, e não um caso legítimo.
-             */
-            pressupostos?: string[];
             euribor_indexante?: string;
             /** Format: double */
             euribor_valor?: number;
@@ -264,18 +199,16 @@ export interface components {
             };
             notas?: string[];
             /**
-             * @description O que se sabe sobre a grelha de onde este preço saiu, e não sobre o preço em si (KAN-49). A sonda confirma — com ~4 pedidos por banco — se a grelha guardada ainda descreve o banco.
-             *     ⚠️ `em_duvida` quer dizer que a última sondagem DISCORDOU da grelha e que ainda não houve varrimento que resolvesse a discordância. A app é **obrigada** a mostrar a nota que vem em `notas`, junto do número — é a mesma regra do `aplicado`.
-             *     ⚠️ `confirmada` e `por_confirmar` mostram-se com **silêncio**. Uma marca de «confirmada» em toda a gente é ruído com aspecto de informação, e treina quem lê a saltar a única que importa.
-             *     ⚠️ **Ausente vale `por_confirmar`**, e nunca `confirmada`: uma omissão que valesse «confirmada» afirmava sobre a série inteira uma coisa que ninguém mediu. Este servidor manda-o sempre; o campo fica opcional porque `required` só tem o que uma oferta não pode não ter.
-             *     ⚠️ E **não leva `default:`** de propósito. Levava, e o `openapi-typescript` traduz um campo com omissão para um campo OBRIGATÓRIO no tipo gerado — a app passava a afirmar que a resposta traz sempre este campo, que é precisamente o que o `required` diz que não. A regra fica na descrição, onde não mente ao gerador.
-             * @enum {string}
+             * @description Verdadeiro quando esta oferta se serviu da cache (§7.6) em vez de se perguntar ao banco agora.
+             *     ⚠️ **Não é o mesmo que `capturado_em`, e nenhum dos dois substitui o outro.** O `capturado_em` diz de QUANDO é o preço, e num acerto de cache é o instante em que se falou com o banco — nunca o de agora. Este diz se ESTE pedido chegou a sair para o banco. Uma oferta fresca e um acerto de um segundo atrás têm `capturado_em` quase igual e `em_cache` diferente.
+             *     ⚠️ Ausente vale `false`, e não leva `default:` de propósito: o `openapi-typescript` traduz um campo com omissão para um campo OBRIGATÓRIO no tipo gerado, e a app passaria a afirmar que a resposta traz sempre este campo — que é precisamente o que o `required` diz que não. A regra fica na descrição, onde não mente ao gerador.
              */
-            fiabilidade?: "por_confirmar" | "confirmada" | "em_duvida";
+            em_cache?: boolean;
             /**
              * Format: date-time
-             * @description Quando o preço foi MEDIDO no banco, durante o varrimento — não quando esta resposta foi calculada (isso é o `calculado_em` da Comparacao).
-             *     ⚠️ Presente sempre que `sucesso` é verdadeiro, e é o campo mais importante desta lista para a honestidade do produto: é o único que diz à pessoa que está a ver um preço de ontem à noite e não de agora. A app é obrigada a mostrá-lo. Escondê-lo apresentaria dados varridos como se fossem uma consulta ao vivo ao banco, que é exactamente o que este serviço não faz.
+             * @description Quando se falou com o banco — o instante em que este preço foi cotado.
+             *     ⚠️ **Não é «agora», e a diferença é a razão de o campo existir.** Num acerto de cache (§7.6) é o instante da ida ao banco que produziu a resposta guardada, e pode ser de há cinco minutos. Numa oferta fresca é de há segundos. Dizia aqui «durante o varrimento», e o varrimento saiu — o que fica é o mesmo compromisso por outro caminho.
+             *     ⚠️ Presente sempre que `sucesso` é verdadeiro, e é o campo mais importante desta lista para a honestidade do produto. A app é obrigada a mostrá-lo, e o servidor **recusa servir** uma oferta com preço e sem ele (`traduzir.go`): um preço sem data apresenta-se como se fosse de agora.
              */
             capturado_em?: string;
             erro?: components["schemas"]["OfertaErro"];
@@ -308,70 +241,6 @@ export interface components {
             /** @example ok */
             estado: string;
         };
-        RateCatalog: {
-            scenarios: components["schemas"]["Scenario"][];
-            count: number;
-            points: components["schemas"]["Point"][];
-        };
-        Scenario: {
-            /** @example ltv80_mista_30a */
-            key: string;
-            /** @example LTV 80% · mista · 30 anos */
-            label: string;
-            /** Format: double */
-            ltv: number;
-            /** Format: double */
-            valor_imovel: number;
-            /** Format: double */
-            montante: number;
-            prazo_anos: number;
-            rate_type: string;
-            /** @description ⚠️ **Nulo na taxa variável**, e é assim que o v1 o envia — medido a 2026-07-28 contra o v1 a correr. Um inteiro não-nulo em Go serializa `0`, e o `viabilidade-imobiliaria` receberia zero anos de período fixo onde espera «não se aplica». */
-            fixed_period_years: number | null;
-        };
-        /** @description ⚠️ `captured_at` é `string` (sem fuso, formato v1) de propósito. `products` é sempre lista, nunca null. Os números são `number`, não string. */
-        Point: {
-            snapshot_id: string;
-            /**
-             * @description ⚠️ Sem fuso, formato v1 (ex.: 2026-07-22T05:00:11). NÃO é date-time.
-             * @example 2026-07-22T05:00:11
-             */
-            captured_at: string;
-            scenario_key: string;
-            bank_id: string;
-            bank_name: string;
-            rate_type: string;
-            /** Format: double */
-            valor_imovel: number;
-            /** Format: double */
-            montante: number;
-            prazo_anos: number;
-            /** @description ⚠️ Nulo na taxa variável, como o v1 o envia. Ver o Scenario. */
-            fixed_period_years: number | null;
-            /** Format: double */
-            tan: number;
-            /** Format: double */
-            taeg: number;
-            /** Format: double */
-            spread: number;
-            /** Format: double */
-            prestacao_mensal: number;
-            /** Format: double */
-            mtic: number;
-            euribor_indexante: string;
-            /** Format: double */
-            euribor_valor: number;
-            products: string[];
-        };
-        SnapshotsResposta: {
-            snapshots: components["schemas"]["Snapshot"][];
-        };
-        Snapshot: {
-            snapshot_id: string;
-            /** @description ⚠️ Sem fuso, formato v1. */
-            captured_at: string;
-            rows: number;
-        };
     };
     responses: {
         /** @description Pedido inválido, com o campo nomeado. */
@@ -385,7 +254,8 @@ export interface components {
         };
         /**
          * @description Tecto de pedidos por IP excedido.
-         *     ⚠️ A razão mudou com a inversão da §1, e o tecto não. Existia porque cada submissão custava dezenas de segundos de scraping a partir do NOSSO IP contra os bancos — hoje custa uma consulta, e essa justificação caiu. Fica por outra, ordinária e suficiente: isto é JSON público e um tecto é o que impede um cliente avariado de esgotar o pool de ligações dos outros. É o mesmo endpoint e um limiar muito mais alto; o que não se faz é apagar o tecto por a primeira razão ter deixado de valer.
+         *     ⚠️ **É estrutural, e não higiene.** Somos um amplificador: uma comparação a cinco bancos são cinco pedidos aqui e ~10 aos simuladores deles, com origem aparente nossa. Sem este tecto, isto é uma ferramenta de carga contra terceiros com uma app à frente.
+         *     ⚠️ Dizia aqui que uma submissão «hoje custa uma consulta». Era verdade entre 2026-07-25 e 2026-08-06, e deixou de ser com a reversão da §1. O tecto fica nos 60/min: uma comparação são 5 pedidos, logo 12 comparações por minuto.
          */
         TectoExcedido: {
             headers: {
@@ -398,11 +268,13 @@ export interface components {
             };
         };
         /**
-         * @description Não há série de mercado que responda a este pedido: nenhum dos bancos escolhidos tem observações utilizáveis.
-         *     ⚠️ Substitui o `DemasiadasEmCurso` do modelo ao vivo, e não é o mesmo 503. Aquele dizia «estamos ocupados a falar com os bancos, volta»; este diz «o varrimento ainda não correu, ou correu e falhou para estes bancos». O primeiro resolvia-se esperando; este resolve-se correndo `simulador varrer` — e é por isso que a mensagem tem de os distinguir em vez de os empacotar num «tenta mais tarde».
+         * @description Já vão pedidos nossos a mais em curso contra este banco: o tecto de concorrência por banco está cheio (ARQUITETURA.md §7.2). Código `banco_ocupado`, e a resposta traz `Retry-After`.
+         *     ⚠️ **Não confundir com a oferta em falha `banco_indisponivel`**, que vem com 200. Essa diz que o banco não respondeu; esta diz que quem não tem lugar somos nós, e o banco está bem. A distinção é para a app poder voltar a pedir este banco daqui a um instante em vez de o riscar da lista.
          */
-        SerieIndisponivel: {
+        BancoOcupado: {
             headers: {
+                /** @description Segundos a esperar antes de voltar a pedir este banco. */
+                "Retry-After"?: number;
                 [name: string]: unknown;
             };
             content: {
@@ -437,78 +309,43 @@ export interface operations {
             };
         };
     };
-    compararOfertas: {
+    ofertaDeUmBanco: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description O id do banco, como vem em GET /api/v1/bancos. */
+                banco: string;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ComparacaoPedido"];
+                "application/json": components["schemas"]["OfertaPedido"];
             };
         };
         responses: {
-            /** @description As ofertas calculadas a partir da série de mercado. */
+            /** @description A oferta do banco, ou a recusa dele com o código nomeado. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Comparacao"];
+                    "application/json": components["schemas"]["Oferta"];
                 };
             };
             400: components["responses"]["PedidoInvalido"];
+            /** @description O id não é banco nenhum. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespostaErro"];
+                };
+            };
             429: components["responses"]["TectoExcedido"];
-            503: components["responses"]["SerieIndisponivel"];
-        };
-    };
-    obterRateCatalog: {
-        parameters: {
-            query?: {
-                scenario?: string;
-                bank?: string;
-                rate_type?: string;
-                /** @description Instante ISO 8601; devolve pontos capturados a partir daqui. */
-                since?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cenários de referência e os pontos de mercado. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RateCatalog"];
-                };
-            };
-        };
-    };
-    listarSnapshots: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A lista de snapshots. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SnapshotsResposta"];
-                };
-            };
+            503: components["responses"]["BancoOcupado"];
         };
     };
     saude: {

@@ -103,28 +103,23 @@ export function melhores(ofertas: Oferta[]): Partial<Record<Metrica, string>> {
   return marcadas;
 }
 
-/**
- * derivada diz se um número desta oferta assenta em hipóteses declaradas.
- *
- * ⚠️ É o que decide a marca `~` antes da TAEG e do MTIC. O contrato é explícito:
- * `pressupostos` **não vem vazio** sempre que a `taeg` ou o `mtic` vêm
- * preenchidos, e vazio com um deles preenchido «é defeito nosso, e não um caso
- * legítimo». A app trata a ausência como o que ela é — um defeito do servidor —
- * e marca à mesma: um número derivado servido com ar de cotado é exactamente a
- * falha que este projecto herdou como regra.
- */
-export function temNumerosDerivados(oferta: Oferta): boolean {
-  return oferta.taeg !== undefined || oferta.mtic !== undefined;
-}
-
-/** ⚠️ Verdadeiro quando o servidor derivou números e não declarou as hipóteses.
- * É defeito dele, e o ecrã di-lo em vez de o esconder. */
-export function pressupostosEmFalta(oferta: Oferta): boolean {
-  return (
-    temNumerosDerivados(oferta) &&
-    (oferta.pressupostos === undefined || oferta.pressupostos.length === 0)
-  );
-}
+// ⚠️ **Havia aqui um `temNumerosDerivados` e um `pressupostosEmFalta`**, e saem
+// a 2026-08-07 com o campo `pressupostos` do contrato. Decidiam a marca `~` antes
+// da TAEG e do MTIC, e a caixa vermelha «é uma falha do nosso servidor» quando um
+// deles vinha sem as hipóteses declaradas. Faziam sentido enquanto a TAEG era
+// **derivada** por um modelo de encargos nosso sobre uma série varrida com um
+// titular neutro; ao vivo é a que o simulador do banco cotou para esta pessoa.
+//
+// ⚠️ **E ia partir todos os cartões.** O servidor ao vivo nunca preenche
+// `pressupostos`, logo `pressupostosEmFalta` era verdadeiro em **toda** a oferta
+// com preço: cada cartão da lista traria a caixa vermelha a acusar-nos de um
+// defeito que não existe. Não chegou a ver-se num ecrã — a app ainda chamava a
+// rota antiga, que dava 404 — e apanhou-se a ler o código.
+//
+// ⚠️ **O que a app continua obrigada a dizer fica**, em `textos.postura`: uma
+// simulação não é uma proposta e não vincula o banco. Mudou o motivo, não o
+// dever — é a distinção entre simulação e proposta, e já não entre estimado e
+// cotado.
 
 /**
  * idadeDosPrecos devolve o `capturado_em` mais antigo das ofertas com preço.
@@ -154,32 +149,34 @@ export function idadeDosPrecos(ofertas: Oferta[]): string | null {
  */
 export type AvisosDoCartao = {
   ajustada: boolean;
-  emDuvida: boolean;
   notas: string[];
 };
 
 /**
  * avisosDoCartao reúne o que tem de aparecer no cartão desta oferta.
  *
- * ⚠️ **Só o `em_duvida` conta.** `confirmada` e `por_confirmar` — e a ausência do
- * campo, que vale `por_confirmar` — mostram-se com silêncio. Uma etiqueta de
- * «confirmada» em toda a gente é ruído com aspecto de informação, e treina quem
- * lê a saltar a única que importa (`ECRAS.md` §3).
+ * ⚠️ **Tinha um terceiro aviso, o `emDuvida`**, ligado ao `fiabilidade` do
+ * contrato (KAN-49): a sonda tinha discordado da grelha de onde o preço saía.
+ * Sai com o campo, a 2026-08-07 — ao vivo não há grelha entre a resposta do
+ * banco e o que se serve, logo não há terceira coisa sobre que ter uma opinião.
+ *
+ * ⚠️ **A regra que ele carregava fica**, e vale para o que vier: `confirmada` e
+ * `por_confirmar` mostravam-se com silêncio, porque uma etiqueta de «confirmada»
+ * em toda a gente é ruído com aspecto de informação e treina quem lê a saltar a
+ * única que importa (`ECRAS.md` §3).
  *
  * ⚠️ E as `notas` entram sempre que existem, e não só quando há ajuste. Até
- * 2026-08-05 pendiam do ajuste no cartão, e uma nota sem ajuste — a do degrau de
- * LTV por resolver — não chegava lá. O detalhe mostrava-a; o cartão, que é o que
- * quase toda a gente lê, não.
+ * 2026-08-05 pendiam do ajuste no cartão, e uma nota sem ajuste não chegava lá.
+ * O detalhe mostrava-a; o cartão, que é o que quase toda a gente lê, não.
  */
 export function avisosDoCartao(oferta: Oferta): AvisosDoCartao {
   return {
     ajustada: temAjuste(oferta),
-    emDuvida: oferta.fiabilidade === "em_duvida",
     notas: oferta.notas ?? [],
   };
 }
 
 /** deveAvisar diz se há alguma coisa para mostrar. */
 export function deveAvisar(a: AvisosDoCartao): boolean {
-  return a.ajustada || a.emDuvida || a.notas.length > 0;
+  return a.ajustada || a.notas.length > 0;
 }

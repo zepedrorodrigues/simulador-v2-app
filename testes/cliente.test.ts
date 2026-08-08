@@ -8,12 +8,18 @@ import {
 import { textos } from "@/textos";
 
 describe("a tradução dos estatutos", () => {
-  it("distingue o 503 de «o servidor está em baixo»", () => {
-    // ⚠️ O 503 do contrato é `SerieIndisponivel`: o varrimento ainda não correu
-    // para estes bancos, e resolve-se correndo `simulador varrer` — não
-    // esperando. Empacotá-lo num «tente mais tarde» genérico mandava a pessoa
-    // esperar por uma coisa que não vai acontecer sozinha.
-    expect(traduzirEstatuto(503)).toBe("semSerie");
+  // ⚠️ **O 503 do contrato é o `banco_ocupado`, e NÃO «o servidor está em
+  // baixo».** O contrato diz por palavras para que serve a distinção: «para a
+  // app poder voltar a pedir este banco daqui a um instante em vez de o riscar
+  // da lista». O banco está bem; quem não tinha lugar éramos nós, e isto passa
+  // sozinho.
+  //
+  // ⚠️ **Este teste afirmava `semSerie` até 2026-08-07**, e a mensagem dele
+  // dizia à pessoa o inverso do que agora é verdade: aquele 503 resolvia-se
+  // correndo o varrimento e não esperando. Trocar os dois manda quem lê fazer
+  // exactamente a coisa errada.
+  it("lê o 503 como o banco ocupado, e não como o servidor em baixo", () => {
+    expect(traduzirEstatuto(503)).toBe("bancoOcupado");
     expect(traduzirEstatuto(500)).toBe("servidorEmBaixo");
     expect(traduzirEstatuto(502)).toBe("servidorEmBaixo");
   });
@@ -21,6 +27,12 @@ describe("a tradução dos estatutos", () => {
   it("nomeia o tecto e o pedido inválido", () => {
     expect(traduzirEstatuto(429)).toBe("tectoExcedido");
     expect(traduzirEstatuto(400)).toBe("pedidoInvalido");
+  });
+
+  // ⚠️ Só se pede um banco cujo id veio do `GET /api/v1/bancos`: um 404 é defeito
+  // nosso, e não um estado que valha a pena explicar a quem está do outro lado.
+  it("não dá ao 404 espécie própria", () => {
+    expect(traduzirEstatuto(404)).toBe("servidorEmBaixo");
   });
 });
 
@@ -31,7 +43,7 @@ describe("as espécies de falha", () => {
     const especies: EspecieDeFalha[] = [
       "semRede",
       "servidorEmBaixo",
-      "semSerie",
+      "bancoOcupado",
       "tectoExcedido",
       "pedidoInvalido",
     ];
@@ -66,7 +78,7 @@ describe("o cliente", () => {
   it("traz o campo que o servidor nomeou num 400", async () => {
     responderCom(400, { erro: { codigo: "pedido_invalido", mensagem: "…", campo: "montante" } });
 
-    await expect(pedir("/api/v1/comparacoes")).rejects.toMatchObject({
+    await expect(pedir("/api/v1/ofertas/cgd")).rejects.toMatchObject({
       especie: "pedidoInvalido",
       campo: "montante",
     });
@@ -75,7 +87,7 @@ describe("o cliente", () => {
   it("lê o Retry-After de um 429", async () => {
     responderCom(429, { erro: { codigo: "tecto_excedido", mensagem: "…" } }, { "Retry-After": "30" });
 
-    await expect(pedir("/api/v1/comparacoes")).rejects.toMatchObject({
+    await expect(pedir("/api/v1/ofertas/cgd")).rejects.toMatchObject({
       especie: "tectoExcedido",
       esperarSegundos: 30,
     });
@@ -104,7 +116,7 @@ describe("o cliente", () => {
   });
 
   it("reconhece a falha que ele próprio atirou", async () => {
-    responderCom(503, { erro: { codigo: "serie_indisponivel", mensagem: "…" } });
+    responderCom(503, { erro: { codigo: "banco_ocupado", mensagem: "…" } });
 
     try {
       await pedir("/api/v1/bancos");

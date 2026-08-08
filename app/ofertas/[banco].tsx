@@ -7,8 +7,8 @@ import { GraficoDeFases } from "@/componentes/GraficoDeFases";
 import { useTema } from "@/design/tema";
 import { espaco, tipo } from "@/design/tokens";
 import { dinheiroAoCentimo, instante, percentagem } from "@/dominio/formatar";
-import { pressupostosEmFalta, temAjuste } from "@/dominio/ofertas";
-import { useOfertas } from "@/estado/comparacao";
+import { temAjuste } from "@/dominio/ofertas";
+import { useOfertaDoBanco } from "@/estado/lista";
 import { frases, textos } from "@/textos";
 
 const t = textos.detalhe;
@@ -16,27 +16,35 @@ const t = textos.detalhe;
 /**
  * O detalhe de uma oferta.
  *
- * ⚠️ **É aqui que os `pressupostos` se mostram por inteiro**, sob a TAEG e o
- * MTIC. É a condição em que a §4 do `ARQUITETURA.md` permite servir números
- * derivados — «assumir e declarar», nunca uma sem a outra — e é o que o Anexo I,
- * Parte II e o Anexo II da MCD mandam fazer a um valor que depende de hipóteses.
+ * ⚠️ **Lê da mesma consulta que a lista**, pela mesma chave: voltar atrás do
+ * detalhe para a lista não repete o pedido ao servidor nem, portanto, ao banco.
+ * Receber a oferta por parâmetro de rota parecia mais simples e deixava este
+ * ecrã a mostrar números velhos quando a lista se actualizasse.
  *
- * ⚠️ **E a proveniência e a hora aparecem sempre**, no rodapé. Não há cache: os
- * valores vêm todos de um varrimento anterior, e a hora não é uma excepção a
- * assinalar — é parte de cada oferta.
+ * ⚠️ **Havia aqui uma secção de `pressupostos`**, sob a TAEG e o MTIC, porque os
+ * dois eram derivados de um modelo de encargos nosso e a MCD manda declarar as
+ * hipóteses junto do número que delas depende. Saiu a 2026-08-07: os números são
+ * os que o simulador do banco cotou, e as hipóteses que **ele** declara chegam
+ * nas `notas`, palavra por palavra.
+ *
+ * ⚠️ **A proveniência e a hora aparecem sempre**, no rodapé. Dizia-se aqui «não
+ * há cache: os valores vêm todos de um varrimento anterior», e as duas metades
+ * são falsas — há cache (5 min) e não há varrimento. O que fica é o que sempre
+ * valeu: a hora não é uma excepção a assinalar, é parte de cada oferta.
  */
 export default function DetalheDaOferta() {
   const tema = useTema();
   const { banco } = useLocalSearchParams<{ banco: string }>();
-  const { corpo, comparacao, aEsperar } = useOfertas();
+  const linha = useOfertaDoBanco(banco);
 
-  if (corpo === null || (comparacao === undefined && !aEsperar)) {
-    return <SemDetalhe />;
+  if (linha === undefined) return <SemDetalhe />;
+  if (linha.estado === "a-esperar") {
+    return <AEsperar descricao={frases.aPerguntarAo(linha.bancoNome)} />;
   }
-  if (comparacao === undefined) return <AEsperar descricao={textos.ofertas.aCalcular} />;
+  if (linha.estado === "nao-chegou") return <SemDetalhe />;
 
-  const oferta = comparacao.ofertas.find((candidata) => candidata.banco_id === banco);
-  if (oferta === undefined || !oferta.sucesso) return <SemDetalhe />;
+  const oferta = linha.oferta;
+  if (!oferta.sucesso) return <SemDetalhe />;
 
   const agora = new Date();
   const capturado = oferta.capturado_em === undefined ? null : instante(oferta.capturado_em, agora);
@@ -46,11 +54,13 @@ export default function DetalheDaOferta() {
       <Text style={[estilos.banco, { color: tema.texto }]}>{oferta.banco_nome}</Text>
 
       <View style={estilos.numeros}>
-        {/* ⚠️ O `~` fica colado ao número, e o rótulo diz o que ele é. A regra
-            transversal do ECRAS.md: nunca um número sem unidade nem contexto. */}
+        {/* ⚠️ O rótulo diz o que o número é. A regra transversal do ECRAS.md:
+            nunca um número sem unidade nem contexto. Levavam um `~` à frente
+            enquanto eram derivados de um modelo nosso; hoje são os que o
+            simulador do banco devolveu, e a marca seria falsa. */}
         <Numero
           rotulo={textos.ofertas.metricas.taeg}
-          valor={oferta.taeg === undefined ? textos.ofertas.semTaeg : `~${percentagem(oferta.taeg, 2)}`}
+          valor={oferta.taeg === undefined ? textos.ofertas.semTaeg : percentagem(oferta.taeg, 2)}
         />
         {oferta.prestacao_mensal !== undefined && (
           <Numero
@@ -61,7 +71,7 @@ export default function DetalheDaOferta() {
         {oferta.mtic !== undefined && (
           <Numero
             rotulo={textos.ofertas.metricas.mtic}
-            valor={`~${dinheiroAoCentimo(oferta.mtic)}`}
+            valor={dinheiroAoCentimo(oferta.mtic)}
           />
         )}
       </View>
@@ -102,22 +112,9 @@ export default function DetalheDaOferta() {
         </Seccao>
       )}
 
-      {/* ⚠️ Lista à parte das notas, e não misturada nelas: uma nota diz o que o
-          banco fez a este pedido, um pressuposto declara em que assunções
-          NOSSAS o número assenta. Empacotá-las juntas deixava a pessoa sem
-          saber qual dos números vem do banco e qual sai de um modelo. */}
-      {oferta.pressupostos !== undefined && oferta.pressupostos.length > 0 && (
-        <Seccao titulo={t.pressupostos}>
-          {oferta.pressupostos.map((pressuposto) => (
-            <Text key={pressuposto} style={[estilos.linha, { color: tema.textoFraco }]}>
-              • {pressuposto}
-            </Text>
-          ))}
-        </Seccao>
-      )}
-
-      {pressupostosEmFalta(oferta) && <Caixa tom="aviso">{textos.ofertas.pressupostosEmFalta}</Caixa>}
-
+      {/* ⚠️ É aqui que chegam as hipóteses que o BANCO declara — o Montepio diz
+          nesta lista que projecta a taxa do período fixo para o resto do prazo.
+          Vêm dele, palavra por palavra, e não se reescrevem. */}
       {oferta.notas !== undefined && oferta.notas.length > 0 && !temAjuste(oferta) && (
         <Seccao titulo={t.notas}>
           {oferta.notas.map((nota) => (
@@ -138,7 +135,7 @@ export default function DetalheDaOferta() {
         <Text style={[estilos.rodape, { color: tema.aviso }]}>{textos.ofertas.semHora}</Text>
       )}
       <Text style={[estilos.rodape, { color: tema.textoFraco }]}>
-        {textos.postura.taegDerivada} {textos.postura.taegOficial}
+        {textos.postura.taegDoSimulador} {textos.postura.taegOficial}
       </Text>
     </ScrollView>
   );

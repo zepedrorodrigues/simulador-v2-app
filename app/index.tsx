@@ -48,7 +48,7 @@ export default function Entrada() {
         ]}
       >
         <Text style={[estilos.nota, { color: tema.aviso }]}>
-          {textos.postura.taegDerivada} {textos.postura.taegOficial}
+          {textos.postura.taegDoSimulador} {textos.postura.taegOficial}
         </Text>
       </View>
 

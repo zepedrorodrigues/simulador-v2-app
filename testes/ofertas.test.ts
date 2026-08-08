@@ -6,7 +6,6 @@ import {
   idadeDosPrecos,
   melhores,
   ordenar,
-  pressupostosEmFalta,
   separar,
   temAjuste,
 } from "@/dominio/ofertas";
@@ -20,7 +19,6 @@ function oferta(retoques: Partial<Oferta> & Pick<Oferta, "banco_id">): Oferta {
     spread: 0.9,
     prestacao_mensal: 870.42,
     mtic: 313_351.2,
-    pressupostos: ["Derivada dos encargos medidos, não cotada."],
     capturado_em: "2026-07-29T05:00:00Z",
     ...retoques,
   };
@@ -145,23 +143,16 @@ describe("a estrela da melhor", () => {
   });
 });
 
-describe("os pressupostos", () => {
-  // ⚠️ O contrato é explícito: `pressupostos` não vem vazio sempre que a `taeg`
-  // ou o `mtic` vêm preenchidos, e vazio com um deles preenchido «é defeito
-  // nosso». A app di-lo em vez de o esconder.
-  it("em falta com números derivados é defeito, e nomeia-se", () => {
-    expect(pressupostosEmFalta(oferta({ banco_id: "cgd", pressupostos: [] }))).toBe(true);
-    expect(pressupostosEmFalta(oferta({ banco_id: "cgd", pressupostos: undefined }))).toBe(true);
-  });
-
-  it("uma oferta sem TAEG nem MTIC não precisa deles", () => {
-    expect(
-      pressupostosEmFalta(
-        oferta({ banco_id: "cgd", taeg: undefined, mtic: undefined, pressupostos: [] }),
-      ),
-    ).toBe(false);
-  });
-});
+// ⚠️ **Havia aqui um `describe("os pressupostos")`** com dois casos, e sai com o
+// campo do contrato (2026-08-07). Afirmava que uma oferta com TAEG e sem
+// `pressupostos` era defeito do servidor e tinha de ser dita em voz alta — o que
+// valia enquanto a TAEG era derivada de um modelo de encargos nosso.
+//
+// ⚠️ **Ao vivo, essa regra acusava toda a gente:** o servidor nunca preenche
+// `pressupostos`, logo todos os cartões com preço traziam a caixa vermelha «é
+// uma falha do nosso servidor». A regra estava certa e a premissa deixou de
+// valer — e o teste passava, porque a fixture preenchia o campo que o servidor
+// a sério não preenche.
 
 describe("a idade dos preços", () => {
   // ⚠️ O mais ANTIGO. O rodapé faz uma afirmação sobre a lista inteira, e dizer
@@ -188,24 +179,11 @@ describe("a idade dos preços", () => {
 });
 
 describe("o que o cartão é obrigado a avisar", () => {
-  it("um preço que a sonda contradisse leva aviso", () => {
-    const avisos = avisosDoCartao(oferta({ banco_id: "cgd", fiabilidade: "em_duvida" }));
-
-    // ⚠️ A asserção diz o que o cartão FAZ, e não `true`. Uma falha que só diz
-    // «esperava true» manda quem lê procurar qual das regras é que caiu.
-    expect(oQueOCartaoMostra(avisos)).toEqual(["preço por confirmar"]);
-  });
-
-  // ⚠️ Os outros dois estados mostram-se com silêncio. Uma etiqueta de
-  // «confirmada» em toda a gente é ruído com aspecto de informação.
-  it.each(["confirmada", "por_confirmar", undefined] as const)(
-    "um banco %s não leva aviso nenhum",
-    (fiabilidade) => {
-      const avisos = avisosDoCartao(oferta({ banco_id: "cgd", fiabilidade }));
-
-      expect(oQueOCartaoMostra(avisos)).toEqual([]);
-    },
-  );
+  // ⚠️ **Havia aqui dois casos sobre o `fiabilidade`** — um preço que a sonda
+  // contradissera levava aviso, os outros dois estados mostravam-se com
+  // silêncio —, e saem com o campo do contrato. Ao vivo não há grelha entre a
+  // resposta do banco e o que se serve, logo não há terceira coisa sobre que
+  // ter uma opinião.
 
   // ⚠️ Até 2026-08-05 as notas pendiam do ajuste no cartão, e uma nota sem
   // ajuste não chegava lá. O detalhe mostrava-a; o cartão não.
@@ -218,32 +196,23 @@ describe("o que o cartão é obrigado a avisar", () => {
   });
 });
 
-// ⚠️ A dúvida NÃO tira a estrela, ao contrário do ajuste. A estrela diz «esta é a
-// melhor das que estão aqui», e uma reserva sobre a idade do preço não a torna
-// falsa — tirá-la escondia a comparação em vez de a qualificar (ECRAS.md §3).
-describe("a dúvida não tira a estrela", () => {
-  it("uma oferta em dúvida continua elegível para melhor", () => {
-    const lista = [
-      oferta({ banco_id: "cgd", taeg: 3.1, fiabilidade: "em_duvida" }),
-      oferta({ banco_id: "novobanco", taeg: 4.2, fiabilidade: "confirmada" }),
-    ];
-
-    expect(melhores(lista).taeg).toBe("cgd");
-  });
-});
+// ⚠️ **Havia aqui um `describe("a dúvida não tira a estrela")`.** Sai com o
+// `fiabilidade`, e a razão que ele guardava fica escrita: uma reserva sobre a
+// idade de um preço não torna falsa a afirmação «esta é a melhor das que estão
+// aqui». O que tira a estrela é o AJUSTE, porque aí os números não respondem ao
+// pedido que a pessoa fez — e esse caso continua afirmado acima.
 
 /**
  * oQueOCartaoMostra reduz os avisos ao que a pessoa lê, por ordem.
  *
  * ⚠️ Existe para as falhas nomearem a regra que caiu. `expect(x).toBe(true)`
- * diz «esperava true» e manda quem lê descobrir qual das cinco regras do cartão
- * é que deixou de valer.
+ * diz «esperava true» e manda quem lê descobrir qual das regras do cartão é que
+ * deixou de valer.
  */
 function oQueOCartaoMostra(avisos: AvisosDoCartao): string[] {
   if (!deveAvisar(avisos)) return [];
   return [
     ...(avisos.ajustada ? ["simulada com alterações"] : []),
-    ...(avisos.emDuvida ? ["preço por confirmar"] : []),
     ...avisos.notas,
   ];
 }

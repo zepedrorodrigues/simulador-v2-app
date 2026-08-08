@@ -1,22 +1,26 @@
 // O cartão de uma oferta na lista.
 //
-// ⚠️ **Quatro coisas são obrigatórias neste cartão**, e nenhuma delas é
-// decoração — são as que separam comparar de induzir em erro (`ECRAS.md` §3):
+// ⚠️ **Três coisas são obrigatórias neste cartão**, e nenhuma delas é decoração —
+// são as que separam comparar de induzir em erro (`ECRAS.md` §3):
 //
-// 1. a marca `~` na TAEG e no MTIC, porque são derivados e não cotados;
-// 2. a nota do ajuste, sempre que `aplicado` não vem vazio;
-// 3. as bonificações aplicadas, senão um banco com descontos por omissão parece
+// 1. a nota do ajuste, sempre que `aplicado` não vem vazio;
+// 2. as bonificações aplicadas, senão um banco com descontos por omissão parece
 //    simplesmente mais barato;
-// 4. os bancos que falharam, com a razão em português;
-// 5. o aviso de um preço que a sonda contradisse (`fiabilidade: em_duvida`).
+// 3. os bancos que falharam, com a razão em português.
+//
+// ⚠️ **Eram cinco, e duas saíram a 2026-08-07** — a marca `~` na TAEG e no MTIC,
+// e o aviso de um preço que a sonda contradisse (`fiabilidade: em_duvida`). As
+// duas descreviam coisas que já não existem: os números são os que o banco cotou,
+// e não há grelha para uma sonda contradizer.
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
+import type { EspecieDeFalha } from "@/api/cliente";
 import type { Oferta } from "@/api/tipos";
 import { useTema } from "@/design/tema";
 import { espaco, raio, tipo } from "@/design/tokens";
 import { dinheiroAoCentimo, percentagem } from "@/dominio/formatar";
-import { avisosDoCartao, deveAvisar, pressupostosEmFalta, type Metrica } from "@/dominio/ofertas";
+import { avisosDoCartao, deveAvisar, type Metrica } from "@/dominio/ofertas";
 import { frases, textos } from "@/textos";
 
 const t = textos.ofertas;
@@ -30,11 +34,8 @@ type Props = {
 
 export function CartaoDeOferta({ oferta, melhorEm, aoAbrir }: Props) {
   const tema = useTema();
-  // ⚠️ Só o `em_duvida` se mostra. `confirmada` e `por_confirmar` mostram-se com
-  // SILÊNCIO — uma etiqueta de «confirmada» em toda a gente é ruído com aspecto
-  // de informação, e treina quem lê a saltar a única que importa (ECRAS.md §3).
   const avisos = avisosDoCartao(oferta);
-  const { ajustada, emDuvida, notas } = avisos;
+  const { ajustada, notas } = avisos;
 
   if (!oferta.sucesso) {
     return <CartaoSemOferta oferta={oferta} />;
@@ -59,10 +60,11 @@ export function CartaoDeOferta({ oferta, melhorEm, aoAbrir }: Props) {
         </View>
       </View>
 
-      {/* ⚠️ O `~` e o rótulo andam juntos. Um número grande sozinho num ecrã de
-          crédito lê-se como a taxa do contrato, e esta não é: é derivada. */}
+      {/* ⚠️ O rótulo vai colado ao número, e é a regra transversal do ECRAS.md:
+          nunca um número sem unidade nem contexto. Um «3,61 %» grande e sozinho
+          num ecrã de crédito não diz se é TAEG ou TAN. */}
       <Text style={[estilos.taeg, { color: tema.texto }]}>
-        {oferta.taeg === undefined ? t.semTaeg : `${t.metricas.taeg} ~${percentagem(oferta.taeg, 2)}`}
+        {oferta.taeg === undefined ? t.semTaeg : `${t.metricas.taeg} ${percentagem(oferta.taeg, 2)}`}
       </Text>
 
       {oferta.prestacao_mensal !== undefined && (
@@ -97,22 +99,11 @@ export function CartaoDeOferta({ oferta, melhorEm, aoAbrir }: Props) {
           {ajustada && (
             <Text style={[estilos.textoDoAviso, { color: tema.aviso }]}>{t.ajustada}</Text>
           )}
-          {emDuvida && (
-            <Text style={[estilos.textoDoAviso, { color: tema.aviso }]}>{t.emDuvida}</Text>
-          )}
           {notas.map((nota) => (
             <Text key={nota} style={[estilos.textoDoAviso, { color: tema.aviso }]}>
               {nota}
             </Text>
           ))}
-        </View>
-      )}
-
-      {/* ⚠️ Defeito nosso, dito em voz alta. O contrato obriga os `pressupostos`
-          sempre que a TAEG ou o MTIC vêm preenchidos. */}
-      {pressupostosEmFalta(oferta) && (
-        <View style={[estilos.aviso, { backgroundColor: tema.falhaFundo }]}>
-          <Text style={[estilos.textoDoAviso, { color: tema.falha }]}>{t.pressupostosEmFalta}</Text>
         </View>
       )}
 
@@ -144,6 +135,66 @@ function CartaoSemOferta({ oferta }: { oferta: Oferta }) {
       {oferta.erro !== undefined && (
         <Text style={[estilos.linha, { color: tema.falha }]}>{oferta.erro.mensagem}</Text>
       )}
+    </View>
+  );
+}
+
+/**
+ * A linha de um banco a quem ainda se está a perguntar.
+ *
+ * ⚠️ **É a lista a encher-se, e não uma barra de progresso** (`ECRAS.md` §2). A
+ * diferença não é estética: uma barra afirma que existe um trabalho nosso a
+ * avançar, e não existe — são N pedidos independentes. Aqui cada linha diz por
+ * si, com o banco nomeado, e uma que já respondeu não volta a este estado.
+ */
+export function CartaoAEsperar({ bancoNome }: { bancoNome: string }) {
+  const tema = useTema();
+
+  return (
+    <View
+      accessibilityRole="text"
+      accessibilityLabel={frases.aPerguntarAo(bancoNome)}
+      style={[estilos.cartao, { backgroundColor: tema.superficie, borderColor: tema.borda }]}
+    >
+      <View style={estilos.topo}>
+        <Text style={[estilos.banco, { color: tema.texto }]}>{bancoNome}</Text>
+        <ActivityIndicator color={tema.primaria} />
+      </View>
+      <Text style={[estilos.linha, { color: tema.textoFraco }]}>
+        {textos.ofertas.aPerguntar}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * A linha de um banco a quem o pedido não chegou.
+ *
+ * ⚠️ **Não é o `CartaoSemOferta`, e a distinção é do desenho e não do estilo.**
+ * Ali a razão é **do banco** e vem escrita pelo servidor — «o Banco Montepio não
+ * respondeu dentro do prazo». Aqui o pedido nem lá chegou: não há frase do banco
+ * a mostrar, e fabricar-lhe uma era a app a afirmar o que ele disse. Diz-se o que
+ * a app sabe, com as palavras dela.
+ */
+export function CartaoNaoChegou({
+  bancoNome,
+  especie,
+}: {
+  bancoNome: string;
+  especie: EspecieDeFalha;
+}) {
+  const tema = useTema();
+
+  return (
+    <View
+      accessibilityRole="text"
+      style={[estilos.cartao, { backgroundColor: tema.falhaFundo, borderColor: tema.borda }]}
+    >
+      <View style={estilos.topo}>
+        <Text style={[estilos.banco, { color: tema.texto }]}>{bancoNome}</Text>
+        <Text style={[estilos.estrela, { color: tema.falha }]}>✕ {textos.ofertas.naoChegou}</Text>
+      </View>
+      <Text style={[estilos.linha, { color: tema.falha }]}>{textos.erros[especie].corpo}</Text>
     </View>
   );
 }
