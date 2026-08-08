@@ -38,10 +38,13 @@ function observador() {
 }
 
 describe("a fila do fan-out", () => {
-  // ⚠️ **É o teste que a `criarFila` existe para poder falhar.** A reversão é
-  // trocar `filaDosBancos(() => tarefa())` por `tarefa()` no `queryFn`, e nessa
-  // montagem este número passa a ser 5 em vez de 3 — a falha diz quantas
-  // estiveram em voo, e não «esperava true».
+  // ⚠️ **É o teste que a `criarFila` existe para poder falhar**, e afirma só a
+  // fila: montada aqui, com tarefas daqui.
+  //
+  // ⚠️ **Dizia que a reversão era tirar a fila do `queryFn`, e isso era falso** —
+  // medido a 2026-08-08: nessa montagem a suite inteira ficava verde, porque
+  // nenhum teste importava o `useOfertasPorBanco`. Quem prende o fio entre a fila
+  // e o pedido é o `fan-out.test.tsx`, e é lá que essa reversão falha.
   it("nunca deixa passar mais do que as vagas", async () => {
     const obs = observador();
     const comVaga = criarFila(3);
