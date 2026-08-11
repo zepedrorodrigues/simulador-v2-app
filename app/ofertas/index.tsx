@@ -8,11 +8,11 @@ import {
   CartaoNaoChegou,
 } from "@/componentes/CartaoDeOferta";
 import { Segmentado, type OpcaoSegmentada } from "@/componentes/controlos";
-import { AEsperar, Falha } from "@/componentes/Estados";
+import { AEsperar, FalhaDoEcra } from "@/componentes/Estados";
 import { useTema } from "@/design/tema";
 import { espaco, tipo } from "@/design/tokens";
 import { instante } from "@/dominio/formatar";
-import { ordenarLinhas, podeMarcarAsMelhores } from "@/dominio/lista";
+import { ordenarLinhas, podeMarcarAsMelhores, resumoDaLista } from "@/dominio/lista";
 import { idadeDosPrecos, melhores, metricas, type Metrica } from "@/dominio/ofertas";
 import { useOfertas } from "@/estado/lista";
 import { usarOrdenacao } from "@/estado/ordenacao";
@@ -44,21 +44,26 @@ const t = textos.ofertas;
  */
 export default function Ofertas() {
   const tema = useTema();
-  const { montado, linhas, ofertas, aEsperarBancos, bancosFalharam, repetirBancos } = useOfertas();
+  const {
+    montado,
+    linhas,
+    ofertas,
+    aEsperarBancos,
+    especieDosBancos,
+    repetirBancos,
+    repetirOfertas,
+  } = useOfertas();
   const criterio = usarOrdenacao((estado) => estado.criterio);
   const definirCriterio = usarOrdenacao((estado) => estado.definir);
 
   if (aEsperarBancos) return <AEsperar descricao={textos.comum.aCarregar} />;
 
-  if (bancosFalharam) {
-    return (
-      <Falha
-        titulo={textos.erros.servidorEmBaixo.titulo}
-        corpo={textos.erros.servidorEmBaixo.corpo}
-        rotuloDeRepetir={textos.comum.tentarDeNovo}
-        aoRepetir={repetirBancos}
-      />
-    );
+  // ⚠️ **A espécie chega aqui, e até 2026-08-11 não chegava:** a falha do
+  // `GET /api/v1/bancos` vinha como um booleano e o ecrã mostrava sempre «O
+  // serviço não está a responder / Isto é do nosso lado». Sem rede, isso é falso
+  // nas duas metades e manda esperar por uma coisa que não passa sozinha.
+  if (especieDosBancos !== null) {
+    return <FalhaDoEcra especie={especieDosBancos} aoRepetir={repetirBancos} />;
   }
 
   // ⚠️ Quem abrir `/ofertas` por URL chega aqui sem pedido — e no alvo web abre,
@@ -75,6 +80,15 @@ export default function Ofertas() {
         />
       </View>
     );
+  }
+
+  // ⚠️ **O que aconteceu a todos mostra-se uma vez.** Cinco cartões a repetir o
+  // mesmo facto, cada um com o nome de um banco por cima, atribuem a cinco bancos
+  // uma coisa que não é de nenhum — é o defeito que o `426` teve, e a única
+  // espécie que sobrevive por banco é o `bancoOcupado`. Ver `resumoDaLista`.
+  const resumo = resumoDaLista(linhas);
+  if (resumo.tipo === "falha-global") {
+    return <FalhaDoEcra especie={resumo.especie} aoRepetir={repetirOfertas} />;
   }
 
   const ordenadas = ordenarLinhas(linhas, criterio);
@@ -97,33 +111,41 @@ export default function Ofertas() {
         aoEscolher={definirCriterio}
       />
 
-      {ordenadas.length === 0 ? (
+      {/* ⚠️ **A frase do vazio afirma sobre o PEDIDO**, e por isso só sai quando
+          todos responderam — é o `resumoDaLista` que o garante. Saía por
+          `ordenadas.length === 0`, que com bancos escolhidos nunca acontece: a
+          frase estava escrita e era inalcançável, e o que a pessoa via com cinco
+          recusas era cinco cartões e nenhuma conclusão. */}
+      {resumo.tipo === "nenhuma-oferta" && (
         <Text style={[estilos.vazio, { color: tema.textoFraco }]}>{t.nenhumaOferta}</Text>
-      ) : (
-        ordenadas.map((linha) => {
-          switch (linha.estado) {
-            case "a-esperar":
-              return <CartaoAEsperar key={linha.bancoId} bancoNome={linha.bancoNome} />;
-            case "nao-chegou":
-              return (
-                <CartaoNaoChegou
-                  key={linha.bancoId}
-                  bancoNome={linha.bancoNome}
-                  especie={linha.especie}
-                />
-              );
-            case "servida":
-              return (
-                <CartaoDeOferta
-                  key={linha.bancoId}
-                  oferta={linha.oferta}
-                  melhorEm={metricasDe(linha.bancoId)}
-                  aoAbrir={() => router.push(`/ofertas/${linha.bancoId}`)}
-                />
-              );
-          }
-        })
       )}
+
+      {/* ⚠️ E as linhas continuam a aparecer por baixo dela: cada banco traz a
+          razão DELE, em português, e cinco razões diferentes não se resumem numa.
+          A frase acima diz o que o conjunto significa; os cartões dizem porquê. */}
+      {ordenadas.map((linha) => {
+        switch (linha.estado) {
+          case "a-esperar":
+            return <CartaoAEsperar key={linha.bancoId} bancoNome={linha.bancoNome} />;
+          case "nao-chegou":
+            return (
+              <CartaoNaoChegou
+                key={linha.bancoId}
+                bancoNome={linha.bancoNome}
+                especie={linha.especie}
+              />
+            );
+          case "servida":
+            return (
+              <CartaoDeOferta
+                key={linha.bancoId}
+                oferta={linha.oferta}
+                melhorEm={metricasDe(linha.bancoId)}
+                aoAbrir={() => router.push(`/ofertas/${linha.bancoId}`)}
+              />
+            );
+        }
+      })}
 
       <Text style={[estilos.rodape, { color: tema.textoFraco }]}>{t.estrelaExplicada}</Text>
 

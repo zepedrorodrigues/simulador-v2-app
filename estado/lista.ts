@@ -51,8 +51,17 @@ export type ListaDeOfertas = {
   aChegar: boolean;
   /** A espera que ocupa o ecrã inteiro: só a lista de bancos. */
   aEsperarBancos: boolean;
-  bancosFalharam: boolean;
+  /** A espécie da falha do `GET /api/v1/bancos`, ou nula se ele respondeu. */
+  especieDosBancos: EspecieDeFalha | null;
   repetirBancos: () => void;
+  /**
+   * Volta a perguntar a todos os bancos.
+   *
+   * ⚠️ **Só se usa quando NADA chegou** (`resumoDaLista` → `falha-global`).
+   * Chamado com meia lista servida, repetia pedidos a bancos que já tinham
+   * respondido — carga em terceiros por uma resposta que já se tem.
+   */
+  repetirOfertas: () => void;
 };
 
 export function useOfertas(): ListaDeOfertas {
@@ -105,8 +114,11 @@ export function useOfertas(): ListaDeOfertas {
     ofertas: linhas.flatMap((linha) => (linha.estado === "servida" ? [linha.oferta] : [])),
     aChegar: linhas.some((linha) => linha.estado === "a-esperar"),
     aEsperarBancos: selecao.aEsperar,
-    bancosFalharam: selecao.falhou,
+    especieDosBancos: selecao.especieDaFalha,
     repetirBancos: selecao.repetir,
+    repetirOfertas: () => {
+      for (const consulta of consultas) consulta.refazer();
+    },
   };
 }
 
