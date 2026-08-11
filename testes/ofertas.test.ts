@@ -3,6 +3,7 @@ import type { AvisosDoCartao } from "@/dominio/ofertas";
 import {
   avisosDoCartao,
   deveAvisar,
+  eFalhaNossa,
   idadeDosPrecos,
   melhores,
   ordenar,
@@ -39,6 +40,52 @@ describe("separar quem tem preço de quem não tem", () => {
     // porque não tem oferta é informação útil.
     expect(separar(lista).semOferta.map((o) => o.banco_id)).toEqual(["bancoctt"]);
     expect(separar(lista).comPreco).toHaveLength(1);
+  });
+});
+
+// ⚠️ **De quem é a falha não está na frase — está no `codigo`** (KAN-30). Uma
+// oferta em falha trazia sempre a razão do banco; desde 2026-08-11 pode trazer a
+// nossa, e a diferença decide o rótulo do cartão (`ECRAS.md` §3).
+describe("de quem é a falha", () => {
+  const nossa = oferta({
+    banco_id: "cgd",
+    sucesso: false,
+    erro: {
+      codigo: "erro_interno",
+      mensagem: "Não se conseguiu pedir a simulação à CGD por uma falha nossa.",
+    },
+  });
+
+  it("um erro interno é nosso", () => {
+    expect(eFalhaNossa(nossa)).toBe(true);
+  });
+
+  it("a recusa de um banco não é nossa", () => {
+    const doBanco = oferta({
+      banco_id: "bancoctt",
+      sucesso: false,
+      erro: { codigo: "prazo_impossivel", mensagem: "O crédito terminaria aos 78 anos." },
+    });
+    expect(eFalhaNossa(doBanco)).toBe(false);
+  });
+
+  // ⚠️ **A omissão segura é «do banco», e é o caso que vai mesmo acontecer:** o
+  // `codigo` é `type: string` sem enum (`API.md` §4), o servidor pode acrescentar
+  // um amanhã, e essa app antiga continua nas lojas. Um código desconhecido
+  // descreve o que aconteceu ao pedir ao banco — tomá-lo por nosso punha-nos a
+  // pedir desculpa por uma recusa dele.
+  it("um código que esta versão não conhece não se assume nosso", () => {
+    const futuro = oferta({
+      banco_id: "montepio",
+      sucesso: false,
+      erro: { codigo: "codigo-que-ainda-nao-existe", mensagem: "Uma coisa qualquer." },
+    });
+    expect(eFalhaNossa(futuro)).toBe(false);
+  });
+
+  // Uma oferta com preço não é falha de ninguém, mesmo que o campo apareça.
+  it("uma oferta com preço nunca é falha nossa", () => {
+    expect(eFalhaNossa(oferta({ banco_id: "cgd" }))).toBe(false);
   });
 });
 

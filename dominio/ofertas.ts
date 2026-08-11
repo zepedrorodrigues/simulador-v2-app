@@ -22,6 +22,29 @@ export function temAjuste(oferta: Oferta): boolean {
 }
 
 /**
+ * O `codigo` de uma oferta em falha cuja causa é **nossa** (`API.md`, KAN-30).
+ *
+ * ⚠️ É o único `codigo` em que a app ramifica, e é a excepção que a §4 do
+ * `API.md` prevê: os outros mostram-se pela `mensagem`, porque o que a pessoa
+ * faz a seguir é o mesmo. Este muda **de quem é a falha**, e isso não está na
+ * frase — está no rótulo do cartão.
+ */
+const codigoDeFalhaNossa = "erro_interno";
+
+/**
+ * eFalhaNossa diz se a oferta falhou por nossa causa e não do banco.
+ *
+ * ⚠️ **Um código desconhecido é falha do banco, e não nossa.** É a omissão
+ * segura das duas: um `codigo` novo que o servidor invente amanhã descreve o que
+ * aconteceu ao pedir ao banco, e assumi-lo nosso punha-nos a pedir desculpa por
+ * uma recusa dele. O campo é `type: string` sem enum de propósito (`API.md` §4),
+ * portanto valores que esta versão não conhece são certos, não hipotéticos.
+ */
+export function eFalhaNossa(oferta: Oferta): boolean {
+  return !oferta.sucesso && oferta.erro?.codigo === codigoDeFalhaNossa;
+}
+
+/**
  * separar divide as ofertas em quem tem preço e quem não tem.
  *
  * ⚠️ **Os bancos que falharam ficam, e ficam no fim.** Ficam porque «um banco que
