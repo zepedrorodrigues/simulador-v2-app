@@ -143,6 +143,11 @@ export const textos = {
     // explicava. Saem com o modelo de encargos: os números são os do banco.
     semTaeg: "Sem TAEG",
     semOferta: "Sem oferta",
+    // ⚠️ **«Sem oferta» afirma uma coisa sobre o banco, e num `erro_interno` essa
+    // coisa não se apurou** (`ECRAS.md` §3, KAN-30): rebentou do nosso lado e o
+    // banco pode nem ter sido interrogado. O rótulo diz de quem é a falha; a
+    // frase por baixo continua a ser a do servidor.
+    falhaNossa: "Falha nossa",
     // ⚠️ Nomeia o banco. «A carregar…» numa lista de cinco linhas não diz por
     // qual se está à espera, que é a única coisa que a pessoa quer saber.
     aPerguntar: "A perguntar ao banco…",

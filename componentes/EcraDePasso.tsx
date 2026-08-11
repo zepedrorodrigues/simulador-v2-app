@@ -9,7 +9,7 @@
 import type { ReactNode } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 
-import { AEsperar, Falha } from "@/componentes/Estados";
+import { AEsperar, FalhaDoEcra } from "@/componentes/Estados";
 import { Passos } from "@/componentes/Passos";
 import { espaco } from "@/design/tokens";
 import { useSelecao, type Selecao } from "@/estado/selecao";
@@ -30,18 +30,14 @@ export function EcraDePasso({ passo, titulo, children }: Props) {
     return <AEsperar descricao={textos.comum.aCarregar} />;
   }
 
-  if (selecao.falhou) {
+  if (selecao.especieDaFalha !== null) {
     // ⚠️ Sem os bancos não há formulário: a lista de períodos, os indexantes e
     // os limites de prazo saem todos de lá. Mostrar um formulário com valores
     // inventados enquanto se espera era pior do que não mostrar nada.
-    return (
-      <Falha
-        titulo={textos.erros.servidorEmBaixo.titulo}
-        corpo={textos.erros.servidorEmBaixo.corpo}
-        rotuloDeRepetir={textos.comum.tentarDeNovo}
-        aoRepetir={selecao.repetir}
-      />
-    );
+    //
+    // ⚠️ **E diz-se qual foi a falha.** Estava fixo em «O serviço não está a
+    // responder / Isto é do nosso lado», e sem rede as duas metades são falsas.
+    return <FalhaDoEcra especie={selecao.especieDaFalha} aoRepetir={selecao.repetir} />;
   }
 
   return (

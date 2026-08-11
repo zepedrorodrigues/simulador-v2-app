@@ -20,7 +20,7 @@ import type { Oferta } from "@/api/tipos";
 import { useTema } from "@/design/tema";
 import { espaco, raio, tipo } from "@/design/tokens";
 import { dinheiroAoCentimo, percentagem } from "@/dominio/formatar";
-import { avisosDoCartao, deveAvisar, type Metrica } from "@/dominio/ofertas";
+import { avisosDoCartao, deveAvisar, eFalhaNossa, type Metrica } from "@/dominio/ofertas";
 import { frases, textos } from "@/textos";
 
 const t = textos.ofertas;
@@ -118,10 +118,24 @@ export function CartaoDeOferta({ oferta, melhorEm, aoAbrir }: Props) {
   );
 }
 
-/** ⚠️ Fica na lista, e com a razão do banco em português. Um banco que
- * desaparece parece um esquecimento. */
+/**
+ * ⚠️ Fica na lista, e com a razão em português. Um banco que desaparece parece
+ * um esquecimento.
+ *
+ * ⚠️ **O rótulo diz de quem é a falha, e são dois** (`ECRAS.md` §3, KAN-30).
+ * «Sem oferta» é uma afirmação sobre o banco — ele foi perguntado e não tem
+ * preço para este pedido. Num `erro_interno` isso não se apurou: rebentou do
+ * nosso lado e ele pode nem ter chegado a ser interrogado. Pôr-lhe «Sem oferta»
+ * dava-lhe fama de não servir este cliente por um defeito nosso, e é o mesmo
+ * erro de atribuição que o servidor acabou de deixar de cometer no `codigo`.
+ *
+ * ⚠️ **A frase continua a ser a do servidor nos dois casos.** Aqui há uma —
+ * escrita por quem sabe o que aconteceu — e é isso que distingue este cartão do
+ * `CartaoNaoChegou`, onde não há e não se inventa.
+ */
 function CartaoSemOferta({ oferta }: { oferta: Oferta }) {
   const tema = useTema();
+  const nossa = eFalhaNossa(oferta);
 
   return (
     <View
@@ -130,7 +144,9 @@ function CartaoSemOferta({ oferta }: { oferta: Oferta }) {
     >
       <View style={estilos.topo}>
         <Text style={[estilos.banco, { color: tema.texto }]}>{oferta.banco_nome}</Text>
-        <Text style={[estilos.estrela, { color: tema.falha }]}>✕ {textos.ofertas.semOferta}</Text>
+        <Text style={[estilos.estrela, { color: tema.falha }]}>
+          ✕ {nossa ? textos.ofertas.falhaNossa : textos.ofertas.semOferta}
+        </Text>
       </View>
       {oferta.erro !== undefined && (
         <Text style={[estilos.linha, { color: tema.falha }]}>{oferta.erro.mensagem}</Text>

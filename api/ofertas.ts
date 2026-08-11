@@ -69,6 +69,15 @@ export type ConsultaDeOferta = {
   oferta: Oferta | undefined;
   aEsperar: boolean;
   erro: unknown;
+  /**
+   * Volta a perguntar a ESTE banco.
+   *
+   * ⚠️ **Custa 1 a 4 pedidos ao simulador dele**, e é por isso que não há um
+   * «actualizar» no ecrã: quem chama isto é o botão de uma falha em que **nada**
+   * chegou (ver `resumoDaLista`), portanto repetir custa no máximo o que a
+   * primeira tentativa teria custado e não se soma a resultados que já existem.
+   */
+  refazer: () => void;
 };
 
 /**
@@ -113,6 +122,9 @@ export function useOfertasPorBanco(
         // ao lado, um banco por pedir ficava eternamente «à espera» no ecrã.
         aEsperar: resultado.isPending && resultado.fetchStatus !== "idle",
         erro: resultado.error,
+        refazer: () => {
+          void resultado.refetch();
+        },
       })),
   });
 }
