@@ -12,6 +12,7 @@
 // uma credencial — uma chave dentro de um bundle de browser é uma chave pública.
 
 import type { RespostaErro } from "./tipos";
+import { cabecalhoDeVersao } from "./versao";
 
 /**
  * A base do servidor.
@@ -37,7 +38,8 @@ export type EspecieDeFalha =
   | "servidorEmBaixo"
   | "bancoOcupado"
   | "tectoExcedido"
-  | "pedidoInvalido";
+  | "pedidoInvalido"
+  | "versaoDemasiadoAntiga";
 
 const marcaDaFalha = "falha-da-api";
 
@@ -124,9 +126,15 @@ async function lerErro(resposta: Response): Promise<{ codigo?: string; campo?: s
  * ⚠️ **O 404 cai no `servidorEmBaixo`, de propósito.** Só se pede um banco cujo
  * id veio do `GET /api/v1/bancos`; se o servidor não o conhece, o defeito é
  * nosso e não um estado que valha a pena explicar a quem está do outro lado.
+ *
+ * ⚠️ **O 426 tem espécie própria, e sem ela caía no `servidorEmBaixo`** — que
+ * diria «Isto é do nosso lado. Tente daqui a pouco.» a quem só precisa de
+ * actualizar. É a diferença entre mandar esperar por uma coisa que passa
+ * sozinha e uma que não passa: a acção está na loja, fora desta app.
  */
 export function traduzirEstatuto(estatuto: number): EspecieDeFalha {
   if (estatuto === 400) return "pedidoInvalido";
+  if (estatuto === 426) return "versaoDemasiadoAntiga";
   if (estatuto === 429) return "tectoExcedido";
   if (estatuto === 503) return "bancoOcupado";
   return "servidorEmBaixo";
@@ -153,7 +161,11 @@ export async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T
     resposta = await fetch(`${baseDaApi}${caminho}`, {
       ...opcoes,
       signal: abortar.signal,
-      headers: { Accept: "application/json", ...opcoes?.headers },
+      // ⚠️ A versão vai em TODOS os pedidos, e é aqui que isso se garante — um
+      // cabeçalho posto em cada sítio que chama a API é um cabeçalho que falta
+      // no sítio que alguém esquecer. Ausente quando não se consegue ler: ver
+      // `versao.ts`.
+      headers: { Accept: "application/json", ...cabecalhoDeVersao(), ...opcoes?.headers },
     });
   } catch (causa) {
     // ⚠️ O `fetch` só atira por rede ou por corte: um 500 é uma resposta e
