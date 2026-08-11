@@ -29,6 +29,13 @@ describe("a tradução dos estatutos", () => {
     expect(traduzirEstatuto(400)).toBe("pedidoInvalido");
   });
 
+  // ⚠️ **Sem espécie própria, o 426 caía no `servidorEmBaixo`** — e a app dizia
+  // «Isto é do nosso lado. Tente daqui a pouco.» a quem tem de actualizar. As
+  // duas frases mandam fazer coisas diferentes, e uma delas não funciona.
+  it("lê o 426 como a versão demasiado antiga, e não como o servidor em baixo", () => {
+    expect(traduzirEstatuto(426)).toBe("versaoDemasiadoAntiga");
+  });
+
   // ⚠️ Só se pede um banco cujo id veio do `GET /api/v1/bancos`: um 404 é defeito
   // nosso, e não um estado que valha a pena explicar a quem está do outro lado.
   it("não dá ao 404 espécie própria", () => {
@@ -46,11 +53,17 @@ describe("as espécies de falha", () => {
       "bancoOcupado",
       "tectoExcedido",
       "pedidoInvalido",
+      "versaoDemasiadoAntiga",
     ];
-    for (const especie of especies) {
-      expect(textos.erros[especie].titulo.length).toBeGreaterThan(0);
-      expect(textos.erros[especie].corpo.length).toBeGreaterThan(0);
-    }
+    // ⚠️ Recolhe-se a lista das que ficaram sem frase em vez de se afirmar uma
+    // a uma: assim a falha DIZ qual é. Afirmado uma a uma, o que aparecia era
+    // «Cannot read properties of undefined» — verdadeiro e inútil, e medido ao
+    // correr este revert.
+    const semFrase = especies.filter(
+      (especie) => !textos.erros[especie]?.titulo || !textos.erros[especie]?.corpo,
+    );
+
+    expect(semFrase).toEqual([]);
   });
 });
 

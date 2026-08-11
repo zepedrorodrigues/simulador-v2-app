@@ -11,7 +11,10 @@
 // `securitySchemes` do contrato. O que protege esta API é o tecto por IP, e não
 // uma credencial — uma chave dentro de um bundle de browser é uma chave pública.
 
+import { marcarVersaoRecusada } from "@/estado/versao";
+
 import type { RespostaErro } from "./tipos";
+import { cabecalhoDeVersao } from "./versao";
 
 /**
  * A base do servidor.
@@ -37,7 +40,8 @@ export type EspecieDeFalha =
   | "servidorEmBaixo"
   | "bancoOcupado"
   | "tectoExcedido"
-  | "pedidoInvalido";
+  | "pedidoInvalido"
+  | "versaoDemasiadoAntiga";
 
 const marcaDaFalha = "falha-da-api";
 
@@ -124,9 +128,15 @@ async function lerErro(resposta: Response): Promise<{ codigo?: string; campo?: s
  * ⚠️ **O 404 cai no `servidorEmBaixo`, de propósito.** Só se pede um banco cujo
  * id veio do `GET /api/v1/bancos`; se o servidor não o conhece, o defeito é
  * nosso e não um estado que valha a pena explicar a quem está do outro lado.
+ *
+ * ⚠️ **O 426 tem espécie própria, e sem ela caía no `servidorEmBaixo`** — que
+ * diria «Isto é do nosso lado. Tente daqui a pouco.» a quem só precisa de
+ * actualizar. É a diferença entre mandar esperar por uma coisa que passa
+ * sozinha e uma que não passa: a acção está na loja, fora desta app.
  */
 export function traduzirEstatuto(estatuto: number): EspecieDeFalha {
   if (estatuto === 400) return "pedidoInvalido";
+  if (estatuto === 426) return "versaoDemasiadoAntiga";
   if (estatuto === 429) return "tectoExcedido";
   if (estatuto === 503) return "bancoOcupado";
   return "servidorEmBaixo";
@@ -153,7 +163,11 @@ export async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T
     resposta = await fetch(`${baseDaApi}${caminho}`, {
       ...opcoes,
       signal: abortar.signal,
-      headers: { Accept: "application/json", ...opcoes?.headers },
+      // ⚠️ A versão vai em TODOS os pedidos, e é aqui que isso se garante — um
+      // cabeçalho posto em cada sítio que chama a API é um cabeçalho que falta
+      // no sítio que alguém esquecer. Ausente quando não se consegue ler: ver
+      // `versao.ts`.
+      headers: { Accept: "application/json", ...cabecalhoDeVersao(), ...opcoes?.headers },
     });
   } catch (causa) {
     // ⚠️ O `fetch` só atira por rede ou por corte: um 500 é uma resposta e
@@ -165,7 +179,15 @@ export async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T
 
   if (!resposta.ok) {
     const { codigo, campo } = await lerErro(resposta);
-    throw new FalhaDaApi(traduzirEstatuto(resposta.status), {
+    const especie = traduzirEstatuto(resposta.status);
+
+    // ⚠️ **Marca-se, E atira-se na mesma.** A marca é o que faz o 426 sair da
+    // lista e ocupar o ecrã (ver `estado/versao.ts`); a falha continua a subir
+    // porque quem chamou tem de saber que este pedido não trouxe nada. Só a
+    // marca deixava as consultas eternamente à espera.
+    if (especie === "versaoDemasiadoAntiga") marcarVersaoRecusada();
+
+    throw new FalhaDaApi(especie, {
       codigo,
       campo,
       esperarSegundos: segundosDoRetryAfter(resposta.headers.get("Retry-After")),
@@ -173,6 +195,28 @@ export async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T
   }
 
   return (await resposta.json()) as T;
+}
+
+/**
+ * Quantas vezes se repete um pedido que NÃO é a um banco. Duas, e desiste.
+ *
+ * ⚠️ Não vale para o caminho dos bancos, que a sobrepõe com uma regra mais
+ * apertada — ver `api/ofertas.ts`.
+ */
+export const tentativasNaRaiz = 2;
+
+/**
+ * repetirNaRaiz é o `retry` do `QueryClient`.
+ *
+ * ⚠️ **Uma versão recusada não se repete, e é o que esta função existe para
+ * dizer.** O `retry: 2` simples mandava o mesmo `GET /api/v1/bancos` três vezes
+ * contra um servidor que já disse que esta app é velha de mais — e a segunda e a
+ * terceira recusas são certas antes de saírem. Insistir só atrasa o ecrã que diz
+ * à pessoa o que fazer.
+ */
+export function repetirNaRaiz(tentativa: number, erro: unknown): boolean {
+  if (eFalhaDaApi(erro) && erro.especie === "versaoDemasiadoAntiga") return false;
+  return tentativa < tentativasNaRaiz;
 }
 
 export async function publicar<T>(caminho: string, corpo: unknown): Promise<T> {

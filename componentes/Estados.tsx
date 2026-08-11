@@ -26,10 +26,18 @@ export function AEsperar({ descricao }: { descricao: string }) {
 type FalhaProps = {
   titulo: string;
   corpo: string;
-  rotuloDeRepetir: string;
-  aoRepetir: () => void;
+  rotuloDeRepetir?: string;
+  aoRepetir?: () => void;
 };
 
+/**
+ * Falha, com ou sem o que fazer a seguir.
+ *
+ * ⚠️ **Sem acção não leva botão, e não é economia de pixels.** Há uma falha em
+ * que repetir não pode funcionar — a versão recusada pelo servidor —, e um
+ * «tentar de novo» ali era um botão que promete uma coisa que não acontece: a
+ * acção é actualizar, e está na loja e não dentro desta app.
+ */
 export function Falha({ titulo, corpo, rotuloDeRepetir, aoRepetir }: FalhaProps) {
   const tema = useTema();
 
@@ -37,7 +45,9 @@ export function Falha({ titulo, corpo, rotuloDeRepetir, aoRepetir }: FalhaProps)
     <View style={estilos.centro}>
       <Text style={[estilos.titulo, { color: tema.texto }]}>{titulo}</Text>
       <Text style={[estilos.corpo, { color: tema.textoFraco }]}>{corpo}</Text>
-      <Botao titulo={rotuloDeRepetir} aoTocar={aoRepetir} variante="secundario" />
+      {aoRepetir !== undefined && rotuloDeRepetir !== undefined && (
+        <Botao titulo={rotuloDeRepetir} aoTocar={aoRepetir} variante="secundario" />
+      )}
     </View>
   );
 }

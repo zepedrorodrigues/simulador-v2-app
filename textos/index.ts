@@ -206,6 +206,16 @@ export const textos = {
       titulo: "Falta rever o pedido",
       corpo: "Há um campo que o servidor não aceitou.",
     },
+    // ⚠️ **Não manda esperar, e é a diferença que interessa.** Sem espécie
+    // própria isto caía no `servidorEmBaixo` — «Isto é do nosso lado. Tente
+    // daqui a pouco.» —, que aponta para uma coisa que passa sozinha. Esta não
+    // passa: a acção é actualizar, e está na loja e não nesta app. Por isso o
+    // ecrã dela também não leva botão de repetir.
+    versaoDemasiadoAntiga: {
+      titulo: "Esta versão já não é suportada",
+      corpo:
+        "A aplicação instalada é anterior à versão que este serviço serve. Actualize-a para voltar a comparar.",
+    },
   },
 } as const;
 
