@@ -8,9 +8,12 @@
 
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
+import type { EspecieDeFalha } from "@/api/cliente";
 import { Botao } from "@/componentes/basicos";
 import { useTema } from "@/design/tema";
 import { espaco, tipo } from "@/design/tokens";
+import { podeRepetir } from "@/dominio/lista";
+import { textos } from "@/textos";
 
 export function AEsperar({ descricao }: { descricao: string }) {
   const tema = useTema();
@@ -49,6 +52,37 @@ export function Falha({ titulo, corpo, rotuloDeRepetir, aoRepetir }: FalhaProps)
         <Botao titulo={rotuloDeRepetir} aoTocar={aoRepetir} variante="secundario" />
       )}
     </View>
+  );
+}
+
+/**
+ * Uma falha que vale para o ecrã inteiro, dita pela espécie.
+ *
+ * ⚠️ **Existe para não haver dois sítios a escolher a frase**, e antes havia
+ * três — os passos do pedido e as ofertas escreviam à mão
+ * `textos.erros.servidorEmBaixo`, fosse qual fosse a falha. Sem rede isso é
+ * falso nas duas metades: não é «do nosso lado» e não passa «daqui a pouco».
+ *
+ * ⚠️ **O botão é uma decisão e não um adorno** (`podeRepetir`): num tecto
+ * excedido ele bate na porta que o servidor acabou de fechar, e numa versão
+ * recusada promete uma acção que vive na loja.
+ */
+export function FalhaDoEcra({
+  especie,
+  aoRepetir,
+}: {
+  especie: EspecieDeFalha;
+  aoRepetir: () => void;
+}) {
+  const podeInsistir = podeRepetir(especie);
+
+  return (
+    <Falha
+      titulo={textos.erros[especie].titulo}
+      corpo={textos.erros[especie].corpo}
+      rotuloDeRepetir={podeInsistir ? textos.comum.tentarDeNovo : undefined}
+      aoRepetir={podeInsistir ? aoRepetir : undefined}
+    />
   );
 }
 

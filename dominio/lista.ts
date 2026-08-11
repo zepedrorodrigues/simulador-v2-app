@@ -5,9 +5,52 @@
 // são decisões sobre o que se afirma a quem compara créditos, e uma decisão
 // dessas tem de poder falhar num teste sem se montar interface nenhuma.
 
+import type { EspecieDeFalha } from "@/api/cliente";
 import type { LinhaDaLista } from "@/estado/lista";
 
 import { ordenar, type Metrica } from "./ofertas";
+
+/**
+ * A única espécie de falha que é mesmo **sobre aquele banco**.
+ *
+ * ⚠️ **O `503 banco_ocupado` conta pedidos NOSSOS em voo contra um banco** — é
+ * por banco por construção, e dois bancos podem estar em estados diferentes ao
+ * mesmo tempo. Todas as outras acontecem **uma vez** e valem para os cinco: não
+ * há rede, o serviço não responde, o tecto por IP fechou, o pedido foi recusado,
+ * a versão é velha.
+ *
+ * ⚠️ **É esta a distinção que decide se uma falha se mostra uma vez ou cinco**, e
+ * mostrá-la cinco não é redundância inofensiva: põe o nome de um banco por cima
+ * de uma coisa que não é dele. Foi o defeito do `426` a 2026-08-11 — cinco
+ * cartões, um por banco, todos a dizer que a versão da app é velha.
+ */
+const especiesPorBanco: readonly EspecieDeFalha[] = ["bancoOcupado"];
+
+export function eSobreOBanco(especie: EspecieDeFalha): boolean {
+  return especiesPorBanco.includes(especie);
+}
+
+/**
+ * Se insistir AGORA pode dar outro resultado.
+ *
+ * ⚠️ **É o que decide se o ecrã leva botão**, e a regra é a do `Estados.tsx`: um
+ * «tentar de novo» que não pode funcionar é um botão que promete uma coisa que
+ * não acontece. Duas espécies estão nesse caso, por razões diferentes:
+ *
+ * - `tectoExcedido` — o servidor mandou esperar a **janela inteira** e diz-lo no
+ *   `Retry-After`. Ele não devolve o que falta dela de propósito, porque «dizer
+ *   exactamente quando reabre convida a bater à porta ao segundo». Um botão aqui
+ *   é bater à porta ao segundo, com o dedo de outra pessoa;
+ * - `versaoDemasiadoAntiga` — a acção está na loja, fora desta app.
+ *
+ * ⚠️ **O `pedidoInvalido` leva botão na mesma, e é discutível**: repetir o mesmo
+ * pedido dá o mesmo `400`. Leva-o porque a acção real — corrigir o campo — está a
+ * dois toques daqui, e um ecrã sem saída nenhuma é pior do que um botão que
+ * devolve a pessoa ao princípio.
+ */
+export function podeRepetir(especie: EspecieDeFalha): boolean {
+  return especie !== "tectoExcedido" && especie !== "versaoDemasiadoAntiga";
+}
 
 /**
  * ordenarLinhas põe as linhas na ordem em que se lêem.
@@ -74,4 +117,59 @@ export function ordenarLinhas(linhas: LinhaDaLista[], metrica: Metrica): LinhaDa
  */
 export function podeMarcarAsMelhores(linhas: LinhaDaLista[]): boolean {
   return !linhas.some((linha) => linha.estado === "a-esperar");
+}
+
+/**
+ * O que a lista é, no seu conjunto — e não linha a linha (A6 do `APP.md`).
+ *
+ * ⚠️ **Existe porque cinco linhas a dizer o mesmo não são cinco informações.**
+ * Quando a mesma coisa aconteceu a todos, e essa coisa **não é sobre nenhum
+ * banco**, a lista deixa de ser uma lista: é um facto único, repetido com o nome
+ * de cinco bancos por cima. Mostra-se uma vez.
+ */
+export type ResumoDaLista =
+  /** Há o que mostrar linha a linha. É o caso comum, e o misto cai aqui. */
+  | { tipo: "lista" }
+  /** Nada chegou, e o que impediu foi o mesmo para todos e não é de banco nenhum. */
+  | { tipo: "falha-global"; especie: EspecieDeFalha }
+  /** Todos responderam, e nenhum tem oferta para este pedido. */
+  | { tipo: "nenhuma-oferta" };
+
+/**
+ * resumoDaLista decide entre mostrar a lista, um ecrã de falha, ou o vazio.
+ *
+ * ⚠️ **Uma linha à espera manda sempre mostrar a lista.** Um veredicto sobre o
+ * conjunto antes de o conjunto estar fechado é a mesma falha da estrela dada a 2
+ * de 5 — e aqui seria pior, porque «não há ofertas» faz a pessoa sair do ecrã.
+ *
+ * ⚠️ **E o misto fica na lista, de propósito.** Se um banco recusou e outro não
+ * respondeu, aconteceram duas coisas diferentes; resumi-las numa frase obrigava
+ * a escolher qual das duas contar. Cada cartão diz o que sabe.
+ *
+ * ⚠️ **`nenhuma-oferta` afirma sobre o PEDIDO, e por isso exige que todos tenham
+ * respondido.** «Nenhum dos bancos tem oferta para este pedido» é uma conclusão
+ * sobre o que se pediu; com um banco que nunca respondeu, o que se sabe é que não
+ * se sabe. Era o que a lista dizia até aqui, sem essa condição.
+ */
+export function resumoDaLista(linhas: LinhaDaLista[]): ResumoDaLista {
+  if (linhas.length === 0) return { tipo: "lista" };
+  if (linhas.some((linha) => linha.estado === "a-esperar")) return { tipo: "lista" };
+
+  const naoChegaram = linhas.flatMap((linha) => (linha.estado === "nao-chegou" ? [linha] : []));
+
+  if (naoChegaram.length === linhas.length) {
+    const [primeira] = naoChegaram;
+    const iguais = naoChegaram.every((linha) => linha.especie === primeira.especie);
+    if (iguais && !eSobreOBanco(primeira.especie)) {
+      return { tipo: "falha-global", especie: primeira.especie };
+    }
+    return { tipo: "lista" };
+  }
+
+  const servidas = linhas.flatMap((linha) => (linha.estado === "servida" ? [linha] : []));
+  if (servidas.length === linhas.length && servidas.every((linha) => !linha.oferta.sucesso)) {
+    return { tipo: "nenhuma-oferta" };
+  }
+
+  return { tipo: "lista" };
 }
