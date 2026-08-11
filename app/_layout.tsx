@@ -1,10 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useColorScheme } from "react-native";
+import { useColorScheme, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { repetirNaRaiz } from "@/api/cliente";
+import { Falha } from "@/componentes/Estados";
 import { useTema } from "@/design/tema";
+import { usarVersaoRecusada } from "@/estado/versao";
 import { textos } from "@/textos";
 
 // ⚠️ O cliente é criado FORA do componente, uma vez. Criado lá dentro, cada
@@ -27,14 +30,44 @@ const clienteDeConsultas = new QueryClient({
       // `api/ofertas.ts`): aqui uma tentativa custa uma consulta, ali custa 1 a
       // 4 pedidos ao simulador público de um banco. Lá repete-se só o
       // `banco_ocupado`, que é a única falha que passa sozinha.
-      retry: 2,
+      //
+      // ⚠️ Era um `retry: 2` simples, e mandava o mesmo pedido três vezes a um
+      // servidor que já tinha dito que esta app é velha de mais. Ver o
+      // `repetirNaRaiz`.
+      retry: repetirNaRaiz,
     },
   },
 });
 
+/**
+ * Raiz — e, quando o servidor recusa esta versão, o ecrã inteiro.
+ *
+ * ⚠️ **O 426 ocupa a raiz e não um cartão, porque não é sobre nenhum ecrã em
+ * particular:** nenhuma rota desta app funciona contra este servidor. Mostrá-lo
+ * dentro da lista dava cinco cartões iguais, um por banco, a atribuir a cada
+ * banco uma coisa que é nossa — e o `estado/lista.ts` existe em boa parte para
+ * essa confusão não acontecer.
+ *
+ * ⚠️ **E não leva botão de repetir.** A acção é actualizar, e está na loja.
+ */
 export default function Raiz() {
   const tema = useTema();
   const escuro = useColorScheme() === "dark";
+  const versaoRecusada = usarVersaoRecusada((estado) => estado.recusada);
+
+  if (versaoRecusada) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style={escuro ? "light" : "dark"} />
+        <View style={{ flex: 1, backgroundColor: tema.fundo }}>
+          <Falha
+            titulo={textos.erros.versaoDemasiadoAntiga.titulo}
+            corpo={textos.erros.versaoDemasiadoAntiga.corpo}
+          />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={clienteDeConsultas}>

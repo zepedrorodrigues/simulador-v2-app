@@ -11,6 +11,8 @@
 // `securitySchemes` do contrato. O que protege esta API é o tecto por IP, e não
 // uma credencial — uma chave dentro de um bundle de browser é uma chave pública.
 
+import { marcarVersaoRecusada } from "@/estado/versao";
+
 import type { RespostaErro } from "./tipos";
 import { cabecalhoDeVersao } from "./versao";
 
@@ -177,7 +179,15 @@ export async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T
 
   if (!resposta.ok) {
     const { codigo, campo } = await lerErro(resposta);
-    throw new FalhaDaApi(traduzirEstatuto(resposta.status), {
+    const especie = traduzirEstatuto(resposta.status);
+
+    // ⚠️ **Marca-se, E atira-se na mesma.** A marca é o que faz o 426 sair da
+    // lista e ocupar o ecrã (ver `estado/versao.ts`); a falha continua a subir
+    // porque quem chamou tem de saber que este pedido não trouxe nada. Só a
+    // marca deixava as consultas eternamente à espera.
+    if (especie === "versaoDemasiadoAntiga") marcarVersaoRecusada();
+
+    throw new FalhaDaApi(especie, {
       codigo,
       campo,
       esperarSegundos: segundosDoRetryAfter(resposta.headers.get("Retry-After")),
@@ -185,6 +195,28 @@ export async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T
   }
 
   return (await resposta.json()) as T;
+}
+
+/**
+ * Quantas vezes se repete um pedido que NÃO é a um banco. Duas, e desiste.
+ *
+ * ⚠️ Não vale para o caminho dos bancos, que a sobrepõe com uma regra mais
+ * apertada — ver `api/ofertas.ts`.
+ */
+export const tentativasNaRaiz = 2;
+
+/**
+ * repetirNaRaiz é o `retry` do `QueryClient`.
+ *
+ * ⚠️ **Uma versão recusada não se repete, e é o que esta função existe para
+ * dizer.** O `retry: 2` simples mandava o mesmo `GET /api/v1/bancos` três vezes
+ * contra um servidor que já disse que esta app é velha de mais — e a segunda e a
+ * terceira recusas são certas antes de saírem. Insistir só atrasa o ecrã que diz
+ * à pessoa o que fazer.
+ */
+export function repetirNaRaiz(tentativa: number, erro: unknown): boolean {
+  if (eFalhaDaApi(erro) && erro.especie === "versaoDemasiadoAntiga") return false;
+  return tentativa < tentativasNaRaiz;
 }
 
 export async function publicar<T>(caminho: string, corpo: unknown): Promise<T> {
