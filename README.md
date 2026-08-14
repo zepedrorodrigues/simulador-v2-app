@@ -33,10 +33,10 @@ e é lá que vivem os documentos que os dois lados partilham:
 | [`docs/APP.md`](https://github.com/zepedrorodrigues/simulador-v2/blob/development/docs/APP.md) | a stack, a estrutura e as fases |
 | [`docs/API.md`](https://github.com/zepedrorodrigues/simulador-v2/blob/development/docs/API.md) | o contrato HTTP |
 
-⚠️ **A publicação nas lojas está bloqueada pela `KAN-24`**, que carrega as
-perguntas jurídicas por responder. Apontava-se aqui o `docs/USO-RESPONSAVEL.md`,
-que saiu do backend no `d155928` — recupera-se com
-`git show 35eb7a5:docs/USO-RESPONSAVEL.md`.
+⚠️ **A publicação nas lojas deixou de estar bloqueada** (2026-08-11): as perguntas
+jurídicas saíram do projecto por decisão do dono, e a A8 passou a ser trabalho por
+fazer. Apontava-se aqui o `docs/USO-RESPONSAVEL.md`, que saiu do backend no
+`d155928` — recupera-se com `git show 35eb7a5:docs/USO-RESPONSAVEL.md`.
 
 ## Stack
 
