@@ -8,4 +8,7 @@
 module.exports = {
   preset: "jest-expo",
   moduleNameMapper: { "^@/(.*)$": "<rootDir>/$1" },
+  // O orçamento das esperas assíncronas, e a medição que o justifica, estão no
+  // ficheiro. Corre depois do ambiente porque a `configure` é da RNTL.
+  setupFilesAfterEnv: ["<rootDir>/testes/configuracao.ts"],
 };
