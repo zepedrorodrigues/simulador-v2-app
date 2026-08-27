@@ -128,6 +128,8 @@ async function lerErro(resposta: Response): Promise<{ codigo?: string; campo?: s
  * ⚠️ **O 404 cai no `servidorEmBaixo`, de propósito.** Só se pede um banco cujo
  * id veio do `GET /api/v1/bancos`; se o servidor não o conhece, o defeito é
  * nosso e não um estado que valha a pena explicar a quem está do outro lado.
+ * O 500 (`erro_interno`, declarado no contrato desde 2026-08-27) cai no mesmo
+ * sítio pela mesma razão: quem está avariado somos nós.
  *
  * ⚠️ **O 426 tem espécie própria, e sem ela caía no `servidorEmBaixo`** — que
  * diria «Isto é do nosso lado. Tente daqui a pouco.» a quem só precisa de
