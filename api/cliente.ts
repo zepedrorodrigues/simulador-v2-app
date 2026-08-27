@@ -13,6 +13,7 @@
 
 import { marcarVersaoRecusada } from "@/estado/versao";
 
+import type { operations } from "./api";
 import type { RespostaErro } from "./tipos";
 import { cabecalhoDeVersao } from "./versao";
 
@@ -137,12 +138,35 @@ async function lerErro(resposta: Response): Promise<{ codigo?: string; campo?: s
  * sozinha e uma que não passa: a acção está na loja, fora desta app.
  */
 export function traduzirEstatuto(estatuto: number): EspecieDeFalha {
-  if (estatuto === 400) return "pedidoInvalido";
-  if (estatuto === 426) return "versaoDemasiadoAntiga";
-  if (estatuto === 429) return "tectoExcedido";
-  if (estatuto === 503) return "bancoOcupado";
-  return "servidorEmBaixo";
+  return (traducoesDoContrato as Record<number, EspecieDeFalha | undefined>)[estatuto] ?? "servidorEmBaixo";
 }
+
+/** As chaves de uma união, uma a uma — `keyof` de uma união só dá as comuns. */
+type ChavesDe<T> = T extends unknown ? keyof T : never;
+
+/** Todos os estatutos que alguma rota do contrato declara, menos o 200. */
+type EstatutoDeErroDoContrato = Exclude<
+  ChavesDe<operations[keyof operations]["responses"]>,
+  200
+>;
+
+/**
+ * A tradução de CADA estatuto de erro que o contrato declara.
+ *
+ * ⚠️ **É um `Record` sobre os estatutos do `api.d.ts`, e é isso que o torna um
+ * teste.** Um estatuto novo no contrato sem entrada aqui é um erro de `tsc`, e
+ * um estatuto que saia do contrato deixa uma entrada a mais — também erro. O 426
+ * e o 429 entraram no servidor antes de a app os saber ler, e foi a ler código
+ * que se deu por isso; a partir daqui é o `npm run tipos` que dá.
+ */
+const traducoesDoContrato: Record<EstatutoDeErroDoContrato, EspecieDeFalha> = {
+  400: "pedidoInvalido",
+  404: "servidorEmBaixo",
+  426: "versaoDemasiadoAntiga",
+  429: "tectoExcedido",
+  500: "servidorEmBaixo",
+  503: "bancoOcupado",
+};
 
 function segundosDoRetryAfter(cabecalho: string | null): number | undefined {
   if (cabecalho === null) return undefined;
