@@ -41,6 +41,15 @@ describe("a tradução dos estatutos", () => {
   it("não dá ao 404 espécie própria", () => {
     expect(traduzirEstatuto(404)).toBe("servidorEmBaixo");
   });
+
+  // ⚠️ A cobertura dos estatutos do contrato afirma-se em `cliente.ts`, por tipo:
+  // a tabela é um `Record` sobre as chaves de `responses` do `api.d.ts`, e o
+  // `tsc` reprova um estatuto a mais ou a menos. Aqui só se afirma que um
+  // estatuto fora do contrato não fica sem espécie.
+  it("dá espécie a um estatuto que o contrato não declara", () => {
+    expect(traduzirEstatuto(418)).toBe("servidorEmBaixo");
+    expect(traduzirEstatuto(502)).toBe("servidorEmBaixo");
+  });
 });
 
 describe("as espécies de falha", () => {
